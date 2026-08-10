@@ -4,20 +4,15 @@ import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  Sparkles, 
-  FileText, 
-  Presentation, 
-  CheckSquare, 
-  Calendar, 
-  ArrowRight, 
-  Zap, 
-  CheckCircle2, 
-  Brain, 
-  Clock, 
-  ShieldCheck, 
-  Cpu, 
-  HeartPulse 
+import {
+  Brain,
+  HeartPulse,
+  ShieldCheck,
+  Cpu,
+  Sparkles,
+  Zap,
+  ArrowRight,
+  Clock,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
