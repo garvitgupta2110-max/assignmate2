@@ -36,6 +36,7 @@
     "noEmit": true,
     "incremental": true,
     "moduleResolution": "node",
+    "ignoreDeprecations": "5.0",
     "jsx": "preserve",
     "plugins": [
       {
@@ -45,11 +46,17 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*",
+    "components/**/*",
+    "hooks/**/*",
+    "lib/**/*",
+    "store/**/*",
+    "public/**/*",
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "../backend",
+    "../plain-html"
   ]
 }

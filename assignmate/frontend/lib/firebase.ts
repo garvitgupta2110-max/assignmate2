@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -8,11 +9,13 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 let app;
 let auth: any = null;
 let googleProvider: any = null;
+let analytics: any = null;
 
 const isFirebaseConfigured = 
   firebaseConfig.apiKey && 
@@ -27,6 +30,10 @@ if (isFirebaseConfigured) {
     googleProvider.setCustomParameters({
       prompt: 'select_account'
     });
+    // Initialize Analytics only in browser environment
+    if (typeof window !== "undefined") {
+      analytics = getAnalytics(app);
+    }
   } catch (error) {
     console.error("Error initializing Firebase Auth:", error);
   }
@@ -38,5 +45,5 @@ if (isFirebaseConfigured) {
   }
 }
 
-export { auth, googleProvider };
+export { auth, googleProvider, analytics };
 export default app;

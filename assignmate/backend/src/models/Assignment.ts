@@ -13,6 +13,7 @@ export interface IAssignment extends Document {
   attachments?: string[];
   visibility: "personal" | "classroom";
   classroomId?: mongoose.Types.ObjectId;
+  targetSectionId?: mongoose.Types.ObjectId;
   assignmentStatus: "active" | "closed";
   createdAt: Date;
   updatedAt: Date;
@@ -71,6 +72,10 @@ const assignmentSchema = new Schema<IAssignment>(
     classroomId: {
       type: Schema.Types.ObjectId,
       ref: "Classroom",
+    },
+    targetSectionId: {
+      type: Schema.Types.ObjectId,
+      required: false,
     },
     assignmentStatus: {
       type: String,

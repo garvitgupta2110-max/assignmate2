@@ -10,27 +10,44 @@ const seed = async () => {
   try {
     await connectDB();
 
-    const email = "test@example.com";
-    const existingUser = await User.findOne({ email });
+    const studentEmail = "test@example.com";
+    const teacherEmail = "teacher@example.com";
 
-    if (existingUser) {
-      console.log("Demo user test@example.com already exists in the database.");
-    } else {
+    const studentExists = await User.findOne({ email: studentEmail });
+    if (!studentExists) {
       const hashedPassword = await bcrypt.hash("password123", 10);
-      const demoUser = new User({
-        email,
+      const demoStudent = new User({
+        email: studentEmail,
         name: "Demo Student",
         password: hashedPassword,
         college: "State University",
         branch: "Computer Science",
-        semester: "6",
+        semester: 6,
+        role: "student",
       });
 
-      await demoUser.save();
-      console.log("Database seeded successfully. Demo user created:");
-      console.log("Email: test@example.com");
-      console.log("Password: password123");
+      await demoStudent.save();
     }
+
+    const teacherExists = await User.findOne({ email: teacherEmail });
+    if (!teacherExists) {
+      const hashedPassword = await bcrypt.hash("teacher123", 10);
+      const demoTeacher = new User({
+        email: teacherEmail,
+        name: "Demo Teacher",
+        password: hashedPassword,
+        college: "State University",
+        branch: "Computer Science",
+        semester: 6,
+        role: "teacher",
+      });
+
+      await demoTeacher.save();
+    }
+
+    console.log("Database seeded successfully.");
+    console.log("Student login: test@example.com / password123");
+    console.log("Teacher login: teacher@example.com / teacher123");
   } catch (error) {
     console.error("Seeding failed:", error);
   } finally {

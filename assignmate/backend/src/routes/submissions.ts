@@ -65,7 +65,10 @@ router.get("/stats/:classroomId", authMiddleware, teacherMiddleware, async (req:
 
     const submissions = await Submission.find({ assignmentId: { $in: assignmentIds } });
 
-    const totalStudents = classroom.studentIds.length;
+    // Count unique students across all sections
+    const allStudentIds: string[] = (classroom as any).sections?.flatMap((s: any) => s.studentIds?.map((id: any) => id.toString()) || []) || [];
+    const uniqueStudentIds = Array.from(new Set(allStudentIds));
+    const totalStudents = uniqueStudentIds.length;
     const totalSubmissions = submissions.filter((s) => s.status !== "pending").length;
     const pendingReviews = submissions.filter((s) => s.status === "submitted" || s.status === "late").length;
     const lateSubmissions = submissions.filter((s) => s.status === "late").length;

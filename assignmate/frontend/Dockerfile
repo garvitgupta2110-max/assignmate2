@@ -1,36 +1,25 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files from frontend directory
-COPY package*.json ./
+COPY frontend/package*.json ./
 
-# Install dependencies
-RUN npm install --production=false
+RUN npm install
 
-# Copy source code
-COPY . .
+COPY frontend/ ./
 
-# Build the application
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+COPY frontend/package*.json ./
 
-# Install only production dependencies
-RUN npm install --production
+RUN npm install --omit=dev
 
-# Copy built app from builder
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
 
-# Expose port
 EXPOSE 3000
 
-# Start the server
 CMD ["npm", "start"]

@@ -4,6 +4,9 @@ import { Assignment } from "../models/Assignment";
 import { Classroom } from "../models/Classroom";
 import { Submission } from "../models/Submission";
 import { Notification } from "../models/Notification";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const router = Router();
 
@@ -21,7 +24,7 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
       }
     } else {
       // Students see personal assignments OR assignments in classrooms they belong to
-      const studentClassrooms = await Classroom.find({ studentIds: req.userId as any });
+      const studentClassrooms = await Classroom.find({ "sections.studentIds": req.userId as any });
       const classroomIds = studentClassrooms.map((c) => c._id);
       
       query = {
@@ -59,8 +62,23 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+// Multer setup for assignment file uploads
+const storage = multer.diskStorage({
+  destination: (req: any, file: any, cb: (err: Error | null, destination: string) => void) => {
+    const uploadDir = path.resolve(__dirname, "..", "..", "uploads", "assignments");
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req: any, file: any, cb: (err: Error | null, filename: string) => void) => {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-]/g, "_");
+    cb(null, `${Date.now()}-${safeName}`);
+  },
+});
+
+const upload = multer({ storage });
+
 // 2. Create new assignment (personal or classroom)
-router.post("/", authMiddleware, async (req: AuthRequest, res) => {
+router.post("/", authMiddleware, upload.array("files", 6), async (req: AuthRequest, res) => {
   try {
     const { title, subject, description, dueDate, priority, visibility, classroomId } = req.body;
 
@@ -75,6 +93,7 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
     };
 
     if (visibility === "classroom") {
+      const { sectionId } = req.body;
       if (!classroomId) {
         return res.status(400).json({ message: "Classroom ID is required for classroom assignments." });
       }
@@ -88,6 +107,10 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
       assignmentData.classroomId = classroomId;
       // Teacher owns this assignment task entry
       assignmentData.userId = classroom.teacherId;
+      // Attach targeted section if provided
+      if (sectionId) {
+        assignmentData.targetSectionId = sectionId;
+      }
     } else {
       assignmentData.userId = req.userId;
       assignmentData.visibility = "personal";
@@ -96,26 +119,53 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
     const assignment = new Assignment(assignmentData);
     await assignment.save();
 
+    // Attach uploaded files to assignment attachments
+    const uploadedFiles = (req.files as any[]) || [];
+    if (uploadedFiles.length > 0) {
+      const publicPaths = uploadedFiles.map(f => `/uploads/assignments/${f.filename}`);
+      assignment.attachments = publicPaths;
+      await assignment.save();
+    }
+
     // If classroom assignment, initialize empty pending Submissions for all enrolled students
     if (visibility === "classroom") {
       const classroom = await Classroom.findById(classroomId);
-      if (classroom && classroom.studentIds.length > 0) {
-        const submissions = classroom.studentIds.map(studentId => ({
-          assignmentId: assignment._id,
-          studentId: studentId,
-          status: "pending",
-          submittedAttachments: [],
-          feedbackHistory: []
-        }));
-        await Submission.insertMany(submissions);
+      if (classroom) {
+        // Determine targeted students: entire classroom or a specific section
+        let targetStudentIds: any[] = [];
+        if ((assignment as any).targetSectionId) {
+          const section = (classroom as any).sections?.find((s: any) => s._id?.toString() === (assignment as any).targetSectionId?.toString());
+          if (!section) {
+            return res.status(404).json({ message: "Target section not found in classroom." });
+          }
+          targetStudentIds = section.studentIds || [];
+        } else {
+          // Flatten all sections' studentIds
+          targetStudentIds = (classroom as any).sections?.flatMap((s: any) => s.studentIds) || [];
+        }
 
-        // Notify all classroom students
-        const notifications = classroom.studentIds.map(studentId => ({
-          userId: studentId,
-          title: "New Assignment Posted",
-          message: `A new assignment "${title}" has been posted in ${classroom.name}.`
-        }));
-        await Notification.insertMany(notifications);
+        // Dedupe student IDs
+        targetStudentIds = Array.from(new Set(targetStudentIds.map((id: any) => id.toString()))).map(id => id);
+
+        if (targetStudentIds.length > 0) {
+          const submissions = targetStudentIds.map(studentId => ({
+            assignmentId: assignment._id,
+            studentId: studentId,
+            status: "pending",
+            submittedAttachments: [],
+            feedbackHistory: []
+          }));
+          await Submission.insertMany(submissions);
+
+          // Notify targeted students
+          const hasAttachments = Array.isArray(assignment.attachments) && assignment.attachments.length > 0;
+          const notifications = targetStudentIds.map(studentId => ({
+            userId: studentId,
+            title: "New Assignment Posted",
+            message: `A new assignment "${title}" has been posted in ${classroom.name}.${hasAttachments ? " It includes attachments." : ""}`
+          }));
+          await Notification.insertMany(notifications);
+        }
       }
     }
 

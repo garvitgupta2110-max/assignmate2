@@ -289,6 +289,14 @@ export default function Assignments() {
     return new Date(dueDateStr) < startOfToday;
   };
 
+  const getAttachmentUrl = (attachmentPath: string) => {
+    if (!attachmentPath) return "#";
+    if (/^https?:\/\//i.test(attachmentPath)) return attachmentPath;
+
+    const apiRoot = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/api$/, "");
+    return `${apiRoot}${attachmentPath.startsWith("/") ? attachmentPath : `/${attachmentPath}`}`;
+  };
+
   const filters = [
     { value: "all", label: "All" },
     { value: "pending", label: "Pending" },
@@ -297,6 +305,14 @@ export default function Assignments() {
     { value: "overdue", label: "Overdue ⏰" },
     { value: "high", label: "High Priority 🔥" },
   ];
+
+  if (user?.role === "teacher") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <ProtectedRoute>
@@ -582,6 +598,36 @@ export default function Assignments() {
                                     {assignment.description}
                                   </p>
                                 )}
+
+                                {Array.isArray(assignment.attachments) && assignment.attachments.length > 0 && (
+                                  <div className="space-y-2 pt-1">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                                      Attachments
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {assignment.attachments.map((attachment: string, attachmentIndex: number) => {
+                                        const attachmentUrl = getAttachmentUrl(attachment);
+                                        const attachmentName = decodeURIComponent(
+                                          attachment.split("/").pop() || `Attachment ${attachmentIndex + 1}`
+                                        );
+
+                                        return (
+                                          <a
+                                            key={`${attachment}-${attachmentIndex}`}
+                                            href={attachmentUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs text-foreground hover:border-primary/60 hover:text-primary transition-colors"
+                                          >
+                                            <Upload className="w-3.5 h-3.5" />
+                                            <span className="max-w-[180px] truncate">{attachmentName}</span>
+                                          </a>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
                                 <div className="flex items-center text-xs text-muted-foreground space-x-4">
                                   <span className="flex items-center">
                                     <CalendarIcon className="w-3.5 h-3.5 mr-1" />

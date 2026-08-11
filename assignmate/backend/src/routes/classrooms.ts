@@ -2,20 +2,7 @@ import { Router } from "express";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
 import { teacherMiddleware } from "../middleware/teacher";
 import { Classroom } from "../models/Classroom";
-import crypto from "crypto";
-
 const router = Router();
-
-// Helper to generate readable strong join codes: SUBJECT-XXXX
-function generateJoinCode(subject: string): string {
-  const cleanSubject = subject
-    .replace(/[^a-zA-Z]/g, "")
-    .substring(0, 4)
-    .toUpperCase();
-  const prefix = cleanSubject.padEnd(4, "X");
-  const randomChars = crypto.randomBytes(2).toString("hex").toUpperCase();
-  return `${prefix}-${randomChars}`;
-}
 
 // 1. Create a Classroom (Teacher Only)
 router.post("/create", authMiddleware, teacherMiddleware, async (req: AuthRequest, res) => {
@@ -26,20 +13,15 @@ router.post("/create", authMiddleware, teacherMiddleware, async (req: AuthReques
       return res.status(400).json({ message: "Classroom name and subject are required." });
     }
 
-    // Generate unique code
-    let joinCode = generateJoinCode(subject);
-    let codeExists = await Classroom.findOne({ joinCode });
-    while (codeExists) {
-      joinCode = generateJoinCode(subject);
-      codeExists = await Classroom.findOne({ joinCode });
-    }
+    const { sections } = req.body;
 
     const classroom = new Classroom({
       name,
       subject,
       teacherId: req.userId,
-      joinCode,
-      studentIds: [],
+      sections: Array.isArray(sections)
+        ? sections.map((s: any) => ({ name: s.name, studentIds: s.studentIds || [] }))
+        : [],
     });
 
     await classroom.save();
@@ -49,31 +31,54 @@ router.post("/create", authMiddleware, teacherMiddleware, async (req: AuthReques
   }
 });
 
-// 2. Join a Classroom (Student Only)
+// 2. Join Classroom (Student Only)
 router.post("/join", authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const { joinCode } = req.body;
+    if (req.userRole !== "student") {
+      return res.status(403).json({ message: "Only students can join classrooms." });
+    }
 
-    if (!joinCode) {
+    const { joinCode } = req.body;
+    if (!joinCode || typeof joinCode !== "string") {
       return res.status(400).json({ message: "Join code is required." });
     }
 
     const classroom = await Classroom.findOne({ joinCode: joinCode.trim().toUpperCase() });
     if (!classroom) {
-      return res.status(404).json({ message: "Classroom not found. Please verify the code." });
+      return res.status(404).json({ message: "Classroom not found for this join code." });
     }
 
-    // Check if student is already enrolled
-    const studentIdObj: any = req.userId;
-    if (classroom.studentIds.includes(studentIdObj)) {
-      return res.status(400).json({ message: "Already joined this classroom." });
+    const studentId = req.userId;
+    const alreadyJoined = (classroom.sections || []).some((section: any) =>
+      (section.studentIds || []).some((id: any) => id.toString() === studentId)
+    );
+
+    if (alreadyJoined) {
+      return res.status(409).json({ message: "You are already enrolled in this classroom." });
     }
 
-    // Add student to classroom
-    classroom.studentIds.push(studentIdObj);
+    const defaultSection = (classroom.sections || []).find((section: any) => section.name === "General")
+      || (classroom.sections || [])[0]
+      || null;
+
+    if (classroom.sections && classroom.sections.length > 0) {
+      const section = classroom.sections[0];
+      if (section && Array.isArray(section.studentIds)) {
+        section.studentIds.push(studentId as any);
+      } else {
+        classroom.sections = [
+          ...(classroom.sections || []),
+          { name: "General", studentIds: [studentId as any] }
+        ];
+      }
+    } else {
+      classroom.sections = [
+        { name: "General", studentIds: [studentId as any] }
+      ];
+    }
+
     await classroom.save();
-
-    res.json({ message: "Successfully joined classroom", classroom });
+    res.status(200).json(classroom);
   } catch (error: any) {
     res.status(500).json({ message: "Failed to join classroom: " + error.message });
   }
@@ -83,10 +88,13 @@ router.post("/join", authMiddleware, async (req: AuthRequest, res) => {
 router.get("/", authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (req.userRole === "teacher") {
-      const classrooms = await Classroom.find({ teacherId: req.userId }).populate("studentIds", "name email");
+      const classrooms = await Classroom.find({ teacherId: req.userId })
+        .populate({ path: "sections.studentIds", select: "name email" });
       return res.json(classrooms);
     } else {
-      const classrooms = await Classroom.find({ studentIds: req.userId }).populate("teacherId", "name email");
+      const classrooms = await Classroom.find({ "sections.studentIds": req.userId })
+        .populate("teacherId", "name email")
+        .populate({ path: "sections.studentIds", select: "name email" });
       return res.json(classrooms);
     }
   } catch (error: any) {

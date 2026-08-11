@@ -89,6 +89,8 @@ export default function TeacherDashboard() {
   const [newDescription, setNewDescription] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
   const [newPriority, setNewPriority] = useState<"low" | "medium" | "high">("medium");
+  const [newSectionId, setNewSectionId] = useState<string>("");
+  const [newFiles, setNewFiles] = useState<FileList | null>(null);
 
   const triggerToast = (title: string, description: string, variant: "default" | "destructive" | "success") => {
     addToast({
@@ -173,6 +175,13 @@ export default function TeacherDashboard() {
   // 6. Create Assignment Mutation
   const createAssignmentMutation = useMutation({
     mutationFn: async (assignmentData: any) => {
+      // If FormData (files attached), let axios set multipart headers
+      if (assignmentData instanceof FormData) {
+        const response = await api.post("/assignments", assignmentData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        return response.data;
+      }
       const response = await api.post("/assignments", assignmentData);
       return response.data;
     },
@@ -187,6 +196,8 @@ export default function TeacherDashboard() {
       setNewDescription("");
       setNewDueDate("");
       setNewPriority("medium");
+      setNewSectionId("");
+      setNewFiles(null);
     },
     onError: (err: any) => {
       triggerToast("Creation Failed", err.response?.data?.message || "An error occurred.", "destructive");
@@ -243,15 +254,33 @@ export default function TeacherDashboard() {
       triggerToast("Validation Error", "Title, Subject and Due Date are required.", "destructive");
       return;
     }
-    createAssignmentMutation.mutate({
-      title: newTitle,
-      subject: newSubject,
-      description: newDescription,
-      dueDate: new Date(newDueDate),
-      priority: newPriority,
-      visibility: "classroom",
-      classroomId: selectedClassroomId,
-    });
+    // If files are present, submit as multipart/form-data
+    if (newFiles && newFiles.length > 0) {
+      const fd = new FormData();
+      fd.append("title", newTitle);
+      fd.append("subject", newSubject);
+      fd.append("description", newDescription);
+      fd.append("dueDate", new Date(newDueDate).toISOString());
+      fd.append("priority", newPriority);
+      fd.append("visibility", "classroom");
+      fd.append("classroomId", selectedClassroomId);
+      if (newSectionId) fd.append("sectionId", newSectionId);
+      for (let i = 0; i < newFiles.length; i++) {
+        fd.append("files", newFiles[i]);
+      }
+      createAssignmentMutation.mutate(fd as any);
+    } else {
+      createAssignmentMutation.mutate({
+        title: newTitle,
+        subject: newSubject,
+        description: newDescription,
+        dueDate: new Date(newDueDate),
+        priority: newPriority,
+        visibility: "classroom",
+        classroomId: selectedClassroomId,
+        sectionId: newSectionId || undefined,
+      });
+    }
   };
 
   const handleToggleAssignmentStatus = (assignment: any) => {
@@ -319,10 +348,8 @@ export default function TeacherDashboard() {
 
   const submissionStatusData = getSubmissionStatusData();
   const isClassroomSelected = !!selectedClassroomId;
-
-
   return (
-    <ProtectedRoute>
+    <ProtectedRoute allowedRoles={["teacher"]}>
       <div className="flex h-screen bg-background">
         <Sidebar />
         <div className="flex-1 flex flex-col">
@@ -418,6 +445,33 @@ export default function TeacherDashboard() {
                             value={newDescription}
                             onChange={(e) => setNewDescription(e.target.value)}
                             className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary h-20 resize-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Target Section</label>
+                          <Select value={newSectionId} onValueChange={setNewSectionId}>
+                            <SelectTrigger className="w-full bg-card border-border/60">
+                              <SelectValue placeholder="All Sections" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border">
+                              <SelectItem value="">All Sections</SelectItem>
+                              {(classrooms || []).find((c: any) => c._id === selectedClassroomId)?.sections?.map((s: any) => (
+                                <SelectItem key={s._id} value={s._id}>
+                                  {s.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Attach PDF(s)</label>
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            multiple
+                            onChange={(e) => setNewFiles(e.target.files)}
+                            className="w-full"
                           />
                         </div>
                         <DialogFooter className="pt-2">
@@ -731,24 +785,27 @@ export default function TeacherDashboard() {
                                 </span>
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleToggleAssignmentStatus(assignment)}
-                                  className="h-8 border-border/40 hover:bg-muted text-xs"
-                                >
-                                  {assignment.assignmentStatus === "closed" ? (
-                                    <>
-                                      <Unlock className="w-3.5 h-3.5 mr-1 text-success" />
-                                      Open Submissions
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Lock className="w-3.5 h-3.5 mr-1 text-destructive" />
-                                      Close Submissions
-                                    </>
-                                  )}
-                                </Button>
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleToggleAssignmentStatus(assignment)}
+                                    className="h-8 border-border/40 hover:bg-muted text-xs"
+                                  >
+                                    {assignment.assignmentStatus === "closed" ? (
+                                      <>
+                                        <Unlock className="w-3.5 h-3.5 mr-1 text-success" />
+                                        Open Submissions
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Lock className="w-3.5 h-3.5 mr-1 text-destructive" />
+                                        Close Submissions
+                                      </>
+                                    )}
+                                  </Button>
+
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}

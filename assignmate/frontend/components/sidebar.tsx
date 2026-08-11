@@ -37,6 +37,7 @@ export function Sidebar() {
   if (mounted && user) {
     if (user.role === "teacher") {
       menuItems.push(
+        { icon: CheckSquare, label: "Assignments", href: "/assignments" },
         { icon: GraduationCap, label: "Teacher Portal", href: "/teacher" },
         { icon: BookOpen, label: "My Classrooms", href: "/classrooms" }
       );

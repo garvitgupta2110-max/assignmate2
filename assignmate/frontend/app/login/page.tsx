@@ -13,9 +13,84 @@ import { motion, AnimatePresence } from "framer-motion";
 import { auth, googleProvider } from "@/lib/firebase";
 import { signInWithPopup } from "firebase/auth";
 
+const programOptions = [
+  "B.Tech (CSE - AI & ML)",
+  "B.Tech (CSE - AI & ML) — Section A",
+  "B.Tech (CSE - AI & ML) — Section B",
+  "B.Tech (CSE - AI & ML) — Section C",
+  "B.Tech (CSE - AI & ML) — Section D",
+  "B.Tech (CSE - AI & ML) — Section E",
+  "B.Tech (CSE - AI & ML) — Section F",
+  "B.Tech (CSE - AI & ML) — Section G",
+  "B.Tech (CSE - Data Science)",
+  "B.Tech (CSE - Data Science) — Section A",
+  "B.Tech (CSE - Data Science) — Section B",
+  "B.Tech (CSE - Data Science) — Section C",
+  "B.Tech (CSE - Data Science) — Section D",
+  "B.Tech (CSE - Data Science) — Section E",
+  "B.Tech (CSE - Data Science) — Section F",
+  "B.Tech (CSE - Data Science) — Section G",
+  "B.Tech (CSE - Data Analytics)",
+  "B.Tech (CSE - Data Analytics) — Section A",
+  "B.Tech (CSE - Data Analytics) — Section B",
+  "B.Tech (CSE - Data Analytics) — Section C",
+  "B.Tech (CSE - Data Analytics) — Section D",
+  "B.Tech (CSE - Data Analytics) — Section E",
+  "B.Tech (CSE - Data Analytics) — Section F",
+  "B.Tech (CSE - Data Analytics) — Section G",
+  "B.Tech (CSE)",
+  "B.Tech (CSE) — Section A",
+  "B.Tech (CSE) — Section B",
+  "B.Tech (CSE) — Section C",
+  "B.Tech (CSE) — Section D",
+  "B.Tech (CSE) — Section E",
+  "B.Tech (CSE) — Section F",
+  "B.Tech (CSE) — Section G",
+  "B.Tech (IT)",
+  "B.Tech (IT) — Section A",
+  "B.Tech (IT) — Section B",
+  "B.Tech (IT) — Section C",
+  "B.Tech (IT) — Section D",
+  "B.Tech (IT) — Section E",
+  "B.Tech (IT) — Section F",
+  "B.Tech (IT) — Section G",
+  "B.Tech (AI & Robotics)",
+  "B.Tech (AI & Robotics) — Section A",
+  "B.Tech (AI & Robotics) — Section B",
+  "B.Tech (AI & Robotics) — Section C",
+  "B.Tech (AI & Robotics) — Section D",
+  "B.Tech (AI & Robotics) — Section E",
+  "B.Tech (AI & Robotics) — Section F",
+  "B.Tech (AI & Robotics) — Section G",
+  "B.Tech (Data Engineering)",
+  "B.Tech (Data Engineering) — Section A",
+  "B.Tech (Data Engineering) — Section B",
+  "B.Tech (Data Engineering) — Section C",
+  "B.Tech (Data Engineering) — Section D",
+  "B.Tech (Data Engineering) — Section E",
+  "B.Tech (Data Engineering) — Section F",
+  "B.Tech (Data Engineering) — Section G",
+  "B.Tech (Cyber Security)",
+  "B.Tech (Cyber Security) — Section A",
+  "B.Tech (Cyber Security) — Section B",
+  "B.Tech (Cyber Security) — Section C",
+  "B.Tech (Cyber Security) — Section D",
+  "B.Tech (Cyber Security) — Section E",
+  "B.Tech (Cyber Security) — Section F",
+  "B.Tech (Cyber Security) — Section G",
+  "B.Tech (AI & DS) — Artificial Intelligence & Data Science",
+  "B.Tech (AI & DS) — Section A",
+  "B.Tech (AI & DS) — Section B",
+  "B.Tech (AI & DS) — Section C",
+  "B.Tech (AI & DS) — Section D",
+  "B.Tech (AI & DS) — Section E",
+  "B.Tech (AI & DS) — Section F",
+  "B.Tech (AI & DS) — Section G",
+];
+
 export default function LoginPage() {
   const router = useRouter();
-  const { setAuth, isAuthenticated } = useAuthStore();
+  const { setAuth, isAuthenticated, user } = useAuthStore();
   const addToast = useToastStore((state) => state.addToast);
 
   const [isLogin, setIsLogin] = useState(true);
@@ -33,9 +108,9 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/dashboard");
+      router.push(user?.role === "teacher" ? "/teacher" : "/dashboard");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, user?.role]);
 
   const triggerToast = (title: string, description: string, variant: "default" | "destructive" | "success") => {
     addToast({
@@ -86,7 +161,7 @@ export default function LoginPage() {
       }, token);
 
       triggerToast("Welcome!", `Signed in successfully with Google as ${backendUser.name}.`, "success");
-      router.push("/dashboard");
+      router.push(backendUser.role === "teacher" ? "/teacher" : "/dashboard");
     } catch (error: any) {
       console.error("Google login failed:", error);
       if (error.code !== "auth/popup-closed-by-user") {
@@ -125,7 +200,7 @@ export default function LoginPage() {
         }, token);
 
         triggerToast("Welcome Back!", `Signed in successfully as ${user.name}.`, "success");
-        router.push("/dashboard");
+        router.push(user.role === "teacher" ? "/teacher" : "/dashboard");
       } else {
         // Sign Up
         const response = await api.post("/auth/signup", {
@@ -151,7 +226,7 @@ export default function LoginPage() {
         }, token);
 
         triggerToast("Account Created", "Your AssignMate account has been set up successfully.", "success");
-        router.push("/dashboard");
+        router.push(user.role === "teacher" ? "/teacher" : "/dashboard");
       }
     } catch (error: any) {
       // Errors are already partially handled by interceptor, but we catch to stop loader
@@ -290,15 +365,20 @@ export default function LoginPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground">Branch / Major</label>
-                        <Input
-                          type="text"
-                          placeholder="Computer Science"
+                        <label className="text-sm font-medium text-muted-foreground">Program / Section</label>
+                        <select
                           value={branch}
                           onChange={(e) => setBranch(e.target.value)}
                           disabled={isLoading}
-                          className="bg-background/50 border-border/60"
-                        />
+                          className="w-full rounded-md border border-border/60 bg-background/50 px-3 py-2 text-sm text-foreground shadow-sm focus:border-primary focus:outline-none"
+                        >
+                          <option value="">Select your program / section</option>
+                          {programOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground">Semester</label>
