@@ -45,22 +45,24 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import Link from "next/link";
 import {
   Users,
   CheckSquare,
-  FileSpreadsheet,
-  TrendingUp,
   Award,
-  Activity,
-  FileIcon,
-  PlusCircle,
-  Calendar,
+  TrendingUp,
   AlertTriangle,
-  FolderOpen,
-  Loader2,
   Clock,
+  FileSpreadsheet,
+  PlusCircle,
+  Plus,
   Unlock,
   Lock,
+  FileIcon,
+  Calendar,
+  Activity,
+  Loader2,
+  FolderOpen,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -100,6 +102,13 @@ export default function TeacherDashboard() {
       variant,
       open: true,
     });
+  };
+
+  const getAttachmentUrl = (attachmentPath: string) => {
+    if (!attachmentPath) return "#";
+    if (/^https?:\/\//i.test(attachmentPath)) return attachmentPath;
+    const apiRoot = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/api$/, "");
+    return `${apiRoot}${attachmentPath.startsWith("/") ? attachmentPath : `/${attachmentPath}`}`;
   };
 
   // 1. Fetch Teacher Classrooms
@@ -360,7 +369,7 @@ export default function TeacherDashboard() {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <h1 className="text-4xl font-bold mb-2">Teacher Portal</h1>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 flex-wrap gap-y-2">
                     <span className="text-sm text-muted-foreground font-semibold">Selected Course:</span>
                     {classroomsLoading ? (
                       <Skeleton className="h-9 w-48" />
@@ -378,46 +387,73 @@ export default function TeacherDashboard() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <span className="text-sm text-destructive">No classrooms found. Create one first!</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-destructive font-medium">No classrooms found.</span>
+                        <Link
+                          href="/classrooms"
+                          className="inline-flex items-center justify-center rounded-md border text-xs font-semibold h-8 px-3 border-primary/40 text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          Create Classroom
+                        </Link>
+                      </div>
                     )}
                   </div>
                 </div>
 
-                {isClassroomSelected && (
-                  <Dialog open={isCreateAssignmentOpen} onOpenChange={setIsCreateAssignmentOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="bg-gradient-to-r from-primary to-secondary">
-                        <PlusCircle className="w-4 h-4 mr-2" />
-                        Post Classroom Assignment
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="border-border/50 bg-card/90 backdrop-blur-md max-w-md w-full">
-                      <DialogHeader>
-                        <DialogTitle className="text-xl font-bold flex items-center">
-                          <CheckSquare className="w-5 h-5 text-primary mr-2" />
-                          Post New Classroom Assignment
-                        </DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleCreateAssignment} className="space-y-4 mt-2">
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-muted-foreground">Assignment Title *</label>
-                          <Input
-                            placeholder="e.g. Midterm Lab Assignment"
-                            value={newTitle}
-                            onChange={(e) => setNewTitle(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-muted-foreground">Subject Code *</label>
-                          <Input
-                            placeholder="e.g. CSE-402"
-                            value={newSubject}
-                            onChange={(e) => setNewSubject(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  {classrooms && classrooms.length > 0 ? (
+                    <Dialog open={isCreateAssignmentOpen} onOpenChange={setIsCreateAssignmentOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="bg-gradient-to-r from-primary to-secondary shadow-lg shadow-primary/20 font-semibold">
+                          <PlusCircle className="w-4 h-4 mr-2" />
+                          Post Classroom Assignment
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="border-border/50 bg-card/90 backdrop-blur-md max-w-md w-full">
+                        <DialogHeader>
+                          <DialogTitle className="text-xl font-bold flex items-center">
+                            <CheckSquare className="w-5 h-5 text-primary mr-2" />
+                            Post New Classroom Assignment
+                          </DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleCreateAssignment} className="space-y-4 mt-2">
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-muted-foreground">Select Classroom *</label>
+                            <select
+                              value={selectedClassroomId}
+                              onChange={(e) => setSelectedClassroomId(e.target.value)}
+                              className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                              required
+                            >
+                              {classrooms.map((c: any) => (
+                                <option key={c._id} value={c._id}>
+                                  {c.name} ({c.subject})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-muted-foreground">Assignment Title *</label>
+                            <Input
+                              placeholder="e.g. Midterm Lab Assignment"
+                              value={newTitle}
+                              onChange={(e) => setNewTitle(e.target.value)}
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-muted-foreground">Subject Code *</label>
+                            <Input
+                              placeholder="e.g. CSE-402"
+                              value={newSubject}
+                              onChange={(e) => setNewSubject(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-1">
                           <label className="text-xs font-semibold text-muted-foreground">Due Date *</label>
                           <Input
                             type="date"
@@ -500,7 +536,16 @@ export default function TeacherDashboard() {
                       </form>
                     </DialogContent>
                   </Dialog>
+                ) : (
+                  <Link
+                    href="/classrooms"
+                    className="inline-flex items-center justify-center rounded-md text-sm font-semibold h-10 px-4 py-2 bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-lg shadow-primary/20 transition-colors"
+                  >
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    Create Classroom First
+                  </Link>
                 )}
+                </div>
               </div>
 
               {/* Stats Cards Section */}
@@ -746,8 +791,16 @@ export default function TeacherDashboard() {
                         <Skeleton className="h-10 w-full" />
                       </div>
                     ) : !assignments || assignments.length === 0 ? (
-                      <div className="py-6 text-center text-muted-foreground text-sm">
-                        No assignments posted in this classroom. Click "Post Classroom Assignment" above to create one.
+                      <div className="py-10 flex flex-col items-center justify-center text-center text-muted-foreground text-sm space-y-3">
+                        <CheckSquare className="w-10 h-10 opacity-30 text-primary" />
+                        <p>No assignments posted in this classroom yet.</p>
+                        <Button
+                          onClick={() => setIsCreateAssignmentOpen(true)}
+                          className="bg-gradient-to-r from-primary to-secondary text-xs h-9 font-semibold shadow-md shadow-primary/20"
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1.5" />
+                          Post First Classroom Assignment
+                        </Button>
                       </div>
                     ) : (
                       <Table>
@@ -967,7 +1020,7 @@ export default function TeacherDashboard() {
                     {activeSubmission.submittedAttachments.map((file: any, index: number) => (
                       <a
                         key={index}
-                        href={file.url}
+                        href={getAttachmentUrl(file.url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-between p-2.5 rounded border border-border bg-card hover:bg-muted/50 hover:border-primary/50 transition-colors"

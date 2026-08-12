@@ -19,6 +19,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import {
   Plus,
   CheckSquare,
@@ -63,10 +64,10 @@ export default function Assignments() {
   // Submit Work states
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
   const [submittingAssignmentId, setSubmittingAssignmentId] = useState("");
+  const [submissionFiles, setSubmissionFiles] = useState<FileList | null>(null);
   const [fileName, setFileName] = useState("");
-  const [fileUrl, setFileUrl] = useState("https://cloudinary.com/assignmate/sample.pdf");
+  const [fileUrl, setFileUrl] = useState("");
   const [fileType, setFileType] = useState("pdf");
-  const [fileSize, setFileSize] = useState("1200");
 
   const triggerToast = (title: string, description: string, variant: "default" | "destructive" | "success") => {
     addToast({
@@ -156,8 +157,14 @@ export default function Assignments() {
 
   // 5. Submit Assignment Mutation
   const submitWorkMutation = useMutation({
-    mutationFn: async ({ id, attachments }: { id: string; attachments: any[] }) => {
-      const response = await api.post(`/assignments/${id}/submit`, { submittedAttachments: attachments });
+    mutationFn: async ({ id, payload }: { id: string; payload: FormData | { submittedAttachments: any[] } }) => {
+      if (payload instanceof FormData) {
+        const response = await api.post(`/assignments/${id}/submit`, payload, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        return response.data;
+      }
+      const response = await api.post(`/assignments/${id}/submit`, payload);
       return response.data;
     },
     onSuccess: () => {
@@ -166,7 +173,9 @@ export default function Assignments() {
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
       triggerToast("Assignment Submitted", "Your work has been successfully uploaded for grading.", "success");
       setIsSubmitOpen(false);
+      setSubmissionFiles(null);
       setFileName("");
+      setFileUrl("");
     },
     onError: (err: any) => {
       triggerToast("Submission Failed", err.response?.data?.message || "An error occurred.", "destructive");
@@ -264,22 +273,39 @@ export default function Assignments() {
 
   const handleSubmitWork = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fileName || !fileUrl) {
-      triggerToast("Validation Error", "Please enter file details.", "destructive");
+
+    if (submissionFiles && submissionFiles.length > 0) {
+      const fd = new FormData();
+      for (let i = 0; i < submissionFiles.length; i++) {
+        fd.append("files", submissionFiles[i]);
+      }
+      submitWorkMutation.mutate({
+        id: submittingAssignmentId,
+        payload: fd,
+      });
       return;
     }
-    submitWorkMutation.mutate({
-      id: submittingAssignmentId,
-      attachments: [
-        {
-          fileName,
-          url: fileUrl,
-          fileType,
-          fileSize: Number(fileSize),
-          publicId: `mock_${Math.random().toString(36).substring(2, 9)}`,
+
+    if (fileUrl) {
+      const actualFileName = fileName.trim() || "Submission.pdf";
+      submitWorkMutation.mutate({
+        id: submittingAssignmentId,
+        payload: {
+          submittedAttachments: [
+            {
+              fileName: actualFileName,
+              url: fileUrl.trim(),
+              fileType,
+              fileSize: 1024,
+              publicId: `upload_${Math.random().toString(36).substring(2, 9)}`,
+            },
+          ],
         },
-      ],
-    });
+      });
+      return;
+    }
+
+    triggerToast("Validation Error", "Please select a file to upload or enter a document URL.", "destructive");
   };
 
   const isOverdue = (dueDateStr: string, status: string) => {
@@ -305,14 +331,6 @@ export default function Assignments() {
     { value: "overdue", label: "Overdue ⏰" },
     { value: "high", label: "High Priority 🔥" },
   ];
-
-  if (user?.role === "teacher") {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
 
   return (
     <ProtectedRoute>
@@ -397,6 +415,17 @@ export default function Assignments() {
                         </form>
                       </DialogContent>
                     </Dialog>
+                  )}
+
+                  {/* Teacher: Post Classroom Assignment Button */}
+                  {user?.role === "teacher" && (
+                    <Link
+                      href="/teacher"
+                      className="inline-flex items-center justify-center rounded-md text-sm font-semibold h-10 px-4 py-2 bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-lg shadow-primary/20 transition-colors"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Post Classroom Assignment
+                    </Link>
                   )}
 
                   {/* Manual Assignment - personal tasks for students */}
@@ -788,65 +817,82 @@ export default function Assignments() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center">
               <Upload className="w-5 h-5 text-primary mr-2" />
-              Submit Assignment Attachments
+              Submit Assignment Work
             </DialogTitle>
             <DialogDescription>
-              Simulate uploading documents/files to complete your classroom submission.
+              Upload your completed PDF or documents directly for teacher review and grading.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmitWork} className="space-y-4 mt-2">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">File Name *</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                <span>Upload PDF / Documents</span>
+                <span className="text-[10px] text-primary font-normal">Direct Upload</span>
+              </label>
               <Input
-                placeholder="Submission_Lab3.pdf"
-                value={fileName}
-                onChange={(e) => setFileName(e.target.value)}
-                required
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip"
+                onChange={(e) => setSubmissionFiles(e.target.files)}
+                className="file:mr-4 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary/20 file:text-primary hover:file:bg-primary/30 cursor-pointer bg-background/50"
               />
+              {submissionFiles && submissionFiles.length > 0 && (
+                <p className="text-[11px] text-success font-medium">
+                  ✓ {submissionFiles.length} file(s) selected for direct upload
+                </p>
+              )}
+            </div>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-border/40"></div>
+              <span className="flex-shrink mx-2 text-[10px] uppercase tracking-wider text-muted-foreground">Or Link Online Document</span>
+              <div className="flex-grow border-t border-border/40"></div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">Simulated Document URL *</label>
+              <label className="text-xs font-semibold text-muted-foreground">Document / PDF URL (Optional)</label>
               <Input
-                placeholder="https://cloudinary.com/assignmate/f0a48d3c.pdf"
+                placeholder="https://drive.google.com/... or https://res.cloudinary.com/..."
                 value={fileUrl}
                 onChange={(e) => setFileUrl(e.target.value)}
-                required
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Document Type</label>
-                <select
-                  value={fileType}
-                  onChange={(e) => setFileType(e.target.value)}
-                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="pdf">PDF Document</option>
-                  <option value="docx">Word Document</option>
-                  <option value="zip">ZIP Archive</option>
-                  <option value="png">PNG Image</option>
-                </select>
+            {fileUrl && (
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground">File Name</label>
+                  <Input
+                    placeholder="Assignment_Work.pdf"
+                    value={fileName}
+                    onChange={(e) => setFileName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground">Type</label>
+                  <select
+                    value={fileType}
+                    onChange={(e) => setFileType(e.target.value)}
+                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="pdf">PDF Document</option>
+                    <option value="docx">Word Document</option>
+                    <option value="zip">ZIP Archive</option>
+                    <option value="png">PNG / JPG Image</option>
+                  </select>
+                </div>
               </div>
+            )}
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Simulated Size (KB)</label>
-                <Input
-                  type="number"
-                  placeholder="1200"
-                  value={fileSize}
-                  onChange={(e) => setFileSize(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="pt-2">
+            <DialogFooter className="pt-3">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsSubmitOpen(false)}
+                onClick={() => {
+                  setIsSubmitOpen(false);
+                  setSubmissionFiles(null);
+                }}
               >
                 Cancel
               </Button>
@@ -861,7 +907,7 @@ export default function Assignments() {
                     Submitting...
                   </>
                 ) : (
-                  "Confirm Submission"
+                  "Submit Work"
                 )}
               </Button>
             </DialogFooter>

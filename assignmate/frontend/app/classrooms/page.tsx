@@ -81,7 +81,8 @@ export default function ClassroomsPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["classrooms"] });
-      triggerToast("Classroom Joined", `Successfully enrolled in "${data.classroom.name}"`, "success");
+      const clsName = data?.name || data?.classroom?.name || "Classroom";
+      triggerToast("Classroom Joined", `Successfully enrolled in "${clsName}"`, "success");
       setIsJoinOpen(false);
       setJoinCodeInput("");
     },

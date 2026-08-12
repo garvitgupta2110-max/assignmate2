@@ -20,7 +20,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const allowedOrigins = [
+const baseAllowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:3002",
@@ -29,16 +29,59 @@ const allowedOrigins = [
   "http://127.0.0.1:3002",
 ];
 
+// Helper to check if origin is allowed
+const isOriginAllowed = (origin?: string): boolean => {
+  if (!origin) return true; // Allow non-browser requests (Postman, server-to-server, mobile)
+  
+  const normalizedOrigin = origin.replace(/\/$/, "");
+  
+  // Explicit base origins
+  if (baseAllowedOrigins.includes(normalizedOrigin)) return true;
+
+  // Check FRONTEND_URL and ALLOWED_ORIGINS env variables
+  const customOrigins = [
+    ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(",") : []),
+    ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : []),
+  ].map((url) => url.trim().replace(/\/$/, ""));
+
+  if (customOrigins.includes(normalizedOrigin) || customOrigins.includes("*")) {
+    return true;
+  }
+
+  // Regex patterns for local dev and cloud platforms (Render, Vercel, Netlify)
+  try {
+    const url = new URL(origin);
+    if (
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname.endsWith(".onrender.com") ||
+      url.hostname.endsWith(".vercel.app") ||
+      url.hostname.endsWith(".netlify.app")
+    ) {
+      return true;
+    }
+  } catch {
+    // If URL parsing fails, continue to check
+  }
+
+  return false;
+};
+
 // Middleware
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
+      if (isOriginAllowed(origin)) {
         callback(null, true);
         return;
       }
-      callback(new Error("Not allowed by CORS"));
+      callback(new Error(`Not allowed by CORS: ${origin}`));
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,

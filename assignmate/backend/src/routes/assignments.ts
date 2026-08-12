@@ -10,6 +10,21 @@ import fs from "fs";
 
 const router = Router();
 
+// Multer setup for assignment file uploads (both teacher creation and student submission)
+const storage = multer.diskStorage({
+  destination: (req: any, file: any, cb: (err: Error | null, destination: string) => void) => {
+    const uploadDir = path.resolve(__dirname, "..", "..", "uploads", "assignments");
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req: any, file: any, cb: (err: Error | null, filename: string) => void) => {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-]/g, "_");
+    cb(null, `${Date.now()}-${safeName}`);
+  },
+});
+
+const upload = multer({ storage });
+
 // 1. Get all assignments for user with filtering, search, and classroom associations
 router.get("/", authMiddleware, async (req: AuthRequest, res) => {
   try {
@@ -27,16 +42,21 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
       const studentClassrooms = await Classroom.find({ "sections.studentIds": req.userId as any });
       const classroomIds = studentClassrooms.map((c) => c._id);
       
-      query = {
-        $or: [
-          { userId: req.userId, visibility: "personal" },
-          { classroomId: { $in: classroomIds }, visibility: "classroom" }
-        ]
-      };
-
       if (classroomId) {
-        // Filter student view by specific classroom ID
-        query = { classroomId: classroomId, visibility: "classroom" };
+        // Filter student view by specific classroom ID if student is enrolled
+        const isEnrolled = classroomIds.some((id) => id.toString() === (classroomId as string));
+        if (isEnrolled) {
+          query = { classroomId: classroomId, visibility: "classroom" };
+        } else {
+          query = { classroomId: classroomId, userId: req.userId };
+        }
+      } else {
+        query = {
+          $or: [
+            { userId: req.userId, visibility: "personal" },
+            { classroomId: { $in: classroomIds }, visibility: "classroom" }
+          ]
+        };
       }
     }
 
@@ -55,27 +75,14 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
       ];
     }
 
-    const assignments = await Assignment.find(query).sort({ dueDate: 1 });
+    const assignments = await Assignment.find(query)
+      .populate("classroomId", "name subject")
+      .sort({ dueDate: 1 });
     res.json(assignments);
   } catch (error: any) {
     res.status(500).json({ message: "Error fetching assignments: " + error.message });
   }
 });
-
-// Multer setup for assignment file uploads
-const storage = multer.diskStorage({
-  destination: (req: any, file: any, cb: (err: Error | null, destination: string) => void) => {
-    const uploadDir = path.resolve(__dirname, "..", "..", "uploads", "assignments");
-    fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: (req: any, file: any, cb: (err: Error | null, filename: string) => void) => {
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-]/g, "_");
-    cb(null, `${Date.now()}-${safeName}`);
-  },
-});
-
-const upload = multer({ storage });
 
 // 2. Create new assignment (personal or classroom)
 router.post("/", authMiddleware, upload.array("files", 6), async (req: AuthRequest, res) => {
@@ -176,15 +183,39 @@ router.post("/", authMiddleware, upload.array("files", 6), async (req: AuthReque
 });
 
 // 3. Submit assignment files (Student Only)
-router.post("/:id/submit", authMiddleware, async (req: AuthRequest, res) => {
+router.post("/:id/submit", authMiddleware, upload.array("files", 6), async (req: AuthRequest, res) => {
   try {
-    const { submittedAttachments } = req.body;
     const assignment = await Assignment.findById(req.params.id);
     if (!assignment) {
       return res.status(404).json({ message: "Assignment not found." });
     }
     if (assignment.assignmentStatus === "closed") {
       return res.status(400).json({ message: "Submissions are closed for this assignment." });
+    }
+
+    let parsedAttachments: any[] = [];
+    if (req.body.submittedAttachments) {
+      if (typeof req.body.submittedAttachments === "string") {
+        try {
+          parsedAttachments = JSON.parse(req.body.submittedAttachments);
+        } catch {
+          parsedAttachments = [];
+        }
+      } else if (Array.isArray(req.body.submittedAttachments)) {
+        parsedAttachments = req.body.submittedAttachments;
+      }
+    }
+
+    // Process actual uploaded files (PDFs, docs, images)
+    const uploadedFiles = (req.files as any[]) || [];
+    if (uploadedFiles.length > 0) {
+      const fileAttachments = uploadedFiles.map((f) => ({
+        fileName: f.originalname,
+        url: `/uploads/assignments/${f.filename}`,
+        fileType: path.extname(f.originalname).replace(".", "").toLowerCase() || "pdf",
+        fileSize: f.size,
+      }));
+      parsedAttachments = [...parsedAttachments, ...fileAttachments];
     }
 
     const now = new Date();
@@ -197,7 +228,7 @@ router.post("/:id/submit", authMiddleware, async (req: AuthRequest, res) => {
     });
 
     if (submission) {
-      submission.submittedAttachments = submittedAttachments || [];
+      submission.submittedAttachments = parsedAttachments;
       submission.submittedAt = now;
       submission.status = status;
       await submission.save();
@@ -205,7 +236,7 @@ router.post("/:id/submit", authMiddleware, async (req: AuthRequest, res) => {
       submission = new Submission({
         assignmentId: assignment._id,
         studentId: req.userId,
-        submittedAttachments: submittedAttachments || [],
+        submittedAttachments: parsedAttachments,
         submittedAt: now,
         status: status,
       });

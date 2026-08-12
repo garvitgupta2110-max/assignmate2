@@ -2,9 +2,15 @@ import axios from "axios";
 import { useAuthStore } from "../store/auth-store";
 import { useToastStore } from "../store/toast-store";
 
+const getBaseURL = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+  const trimmed = envUrl.trim().replace(/\/+$/, "");
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+};
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api",
-  timeout: 10000,
+  baseURL: getBaseURL(),
+  timeout: 15000,
 });
 
 const triggerToast = (title: string, description: string, variant: "default" | "destructive" | "success" = "default") => {
