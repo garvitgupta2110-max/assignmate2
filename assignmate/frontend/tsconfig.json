@@ -35,8 +35,7 @@
     "allowJs": true,
     "noEmit": true,
     "incremental": true,
-    "moduleResolution": "node",
-    "ignoreDeprecations": "5.0",
+    "moduleResolution": "bundler",
     "jsx": "preserve",
     "plugins": [
       {

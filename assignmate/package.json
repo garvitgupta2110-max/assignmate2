@@ -1,0 +1,9 @@
+{
+  "name": "assignmate-deploy",
+  "version": "1.0.0",
+  "scripts": {
+    "postinstall": "npm --prefix backend install",
+    "build": "npm --prefix backend run build",
+    "start": "npm --prefix backend start"
+  }
+}
