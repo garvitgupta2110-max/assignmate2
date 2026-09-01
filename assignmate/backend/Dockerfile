@@ -26,8 +26,6 @@ RUN npm run build
 # Remove dev dependencies
 RUN npm prune --production
 
-# Port
 EXPOSE 5000
 
-# Start server
 CMD ["npm", "start"]
