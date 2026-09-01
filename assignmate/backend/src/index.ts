@@ -97,8 +97,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.resolve(__dirname, "..", "uploads")));
 
 // Health check
-app.get("/health", (req, res) => {
-  res.json({ status: "Server is running" });
+app.get(["/health", "/api/health"], (req, res) => {
+  res.json({
+    status: "Server is running",
+  });
 });
 
 // Routes
