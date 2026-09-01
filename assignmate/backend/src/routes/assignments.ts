@@ -88,7 +88,38 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
 // 2. Create new assignment (personal or classroom)
 router.post("/", authMiddleware, upload.array("files", 6), async (req: AuthRequest, res) => {
   try {
-    const { title, subject, description, dueDate, priority, visibility, classroomId } = req.body;
+    const {
+      title,
+      subject,
+      description,
+      dueDate,
+      priority,
+      visibility,
+      classroomId,
+      assignmentType,
+      allowedLanguages,
+      starterCode,
+      sampleInput,
+      expectedOutput,
+    } = req.body;
+
+    let parsedAllowedLanguages: string[] = ["c", "python", "java"];
+    if (allowedLanguages) {
+      if (Array.isArray(allowedLanguages)) {
+        parsedAllowedLanguages = allowedLanguages;
+      } else if (typeof allowedLanguages === "string") {
+        try {
+          const parsed = JSON.parse(allowedLanguages);
+          if (Array.isArray(parsed)) {
+            parsedAllowedLanguages = parsed;
+          } else {
+            parsedAllowedLanguages = [allowedLanguages];
+          }
+        } catch {
+          parsedAllowedLanguages = allowedLanguages.split(",").map((l: string) => l.trim()).filter(Boolean);
+        }
+      }
+    }
 
     const assignmentData: any = {
       title,
@@ -98,6 +129,11 @@ router.post("/", authMiddleware, upload.array("files", 6), async (req: AuthReque
       priority,
       creatorId: req.userId,
       visibility: visibility || "personal",
+      assignmentType: assignmentType || "document",
+      allowedLanguages: parsedAllowedLanguages,
+      starterCode: starterCode || undefined,
+      sampleInput: sampleInput || undefined,
+      expectedOutput: expectedOutput || undefined,
     };
 
     if (visibility === "classroom") {
@@ -166,11 +202,14 @@ router.post("/", authMiddleware, upload.array("files", 6), async (req: AuthReque
           await Submission.insertMany(submissions);
 
           // Notify targeted students
+          const isCode = assignment.assignmentType === "code";
           const hasAttachments = Array.isArray(assignment.attachments) && assignment.attachments.length > 0;
           const notifications = targetStudentIds.map(studentId => ({
             userId: studentId,
-            title: "New Assignment Posted",
-            message: `A new assignment "${title}" has been posted in ${classroom.name}.${hasAttachments ? " It includes attachments." : ""}`
+            title: isCode ? "New Code Assignment Posted" : "New Assignment Posted",
+            message: isCode
+              ? `A new coding assignment "${title}" has been posted in ${classroom.name}. Solve it directly in the online code compiler.`
+              : `A new assignment "${title}" has been posted in ${classroom.name}.${hasAttachments ? " It includes attachments." : ""}`
           }));
           await Notification.insertMany(notifications);
         }
@@ -342,11 +381,14 @@ router.get("/my-submissions", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-// 5. Update assignment progress (Student personal tasks only)
+// 5. Update assignment progress or details
 router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const assignment = await Assignment.findOneAndUpdate(
-      { _id: req.params.id, userId: req.userId },
+      {
+        _id: req.params.id,
+        $or: [{ userId: req.userId }, { creatorId: req.userId }],
+      },
       req.body,
       { new: true }
     );

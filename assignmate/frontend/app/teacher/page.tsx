@@ -46,6 +46,7 @@ import {
   Cell,
 } from "recharts";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Users,
   CheckSquare,
@@ -74,6 +75,7 @@ import api from "@/lib/api";
 const CHART_COLORS = ["#5865F2", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
 
 export default function TeacherDashboard() {
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const addToast = useToastStore((state) => state.addToast);
@@ -96,6 +98,43 @@ export default function TeacherDashboard() {
   const [newPriority, setNewPriority] = useState<"low" | "medium" | "high">("medium");
   const [newSectionId, setNewSectionId] = useState<string>("");
   const [newFiles, setNewFiles] = useState<FileList | null>(null);
+
+  // Code Assignment Specific States
+  const [newAssignmentType, setNewAssignmentType] = useState<"document" | "code">("document");
+  const [newAllowedLanguage, setNewAllowedLanguage] = useState<"all" | "python" | "c" | "java">("all");
+  const [newStarterCode, setNewStarterCode] = useState<string>("");
+  const [newSampleInput, setNewSampleInput] = useState<string>("");
+  const [newExpectedOutput, setNewExpectedOutput] = useState<string>("");
+
+  const CODE_STARTERS: Record<string, string> = {
+    python: `# Python 3 Solution Template
+def solve():
+    # Read input or write solution logic
+    pass
+
+if __name__ == "__main__":
+    solve()
+`,
+    c: `#include <stdio.h>
+
+int main() {
+    // Write your C solution here
+    return 0;
+}
+`,
+    java: `import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        // Write your Java solution here
+    }
+}
+`,
+    all: `# Starter template
+# Write your code solution here
+`,
+  };
 
   const triggerToast = (title: string, description: string, variant: "default" | "destructive" | "success") => {
     addToast({
@@ -197,12 +236,15 @@ export default function TeacherDashboard() {
       const response = await api.post("/assignments", assignmentData);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["classroomAssignments", selectedClassroomId] });
       queryClient.invalidateQueries({ queryKey: ["classroomSubmissions", selectedClassroomId] });
       queryClient.invalidateQueries({ queryKey: ["classroomStats", selectedClassroomId] });
-      triggerToast("Assignment Posted", "The classroom assignment was created and students notified.", "success");
       setIsCreateAssignmentOpen(false);
+
+      const isCode = data?.assignmentType === "code" || newAssignmentType === "code";
+      const createdId = data?._id || data?.id;
+
       setNewTitle("");
       setNewSubject("");
       setNewDescription("");
@@ -210,6 +252,18 @@ export default function TeacherDashboard() {
       setNewPriority("medium");
       setNewSectionId("");
       setNewFiles(null);
+      setNewAssignmentType("document");
+      setNewAllowedLanguage("all");
+      setNewStarterCode("");
+      setNewSampleInput("");
+      setNewExpectedOutput("");
+
+      if (isCode && createdId) {
+        triggerToast("Code Assignment Posted", "Redirecting to online code compiler...", "success");
+        router.push(`/compiler?assignmentId=${createdId}`);
+      } else {
+        triggerToast("Assignment Posted", "The classroom assignment was created and students notified.", "success");
+      }
     },
     onError: (err: any) => {
       triggerToast("Creation Failed", err.response?.data?.message || "An error occurred.", "destructive");
@@ -266,6 +320,9 @@ export default function TeacherDashboard() {
       triggerToast("Validation Error", "Title, Subject and Due Date are required.", "destructive");
       return;
     }
+
+    const allowedLanguages = newAllowedLanguage === "all" ? ["c", "python", "java"] : [newAllowedLanguage];
+
     // If files are present, submit as multipart/form-data
     if (newFiles && newFiles.length > 0) {
       const fd = new FormData();
@@ -277,6 +334,13 @@ export default function TeacherDashboard() {
       fd.append("visibility", "classroom");
       fd.append("classroomId", selectedClassroomId);
       if (newSectionId) fd.append("sectionId", newSectionId);
+      fd.append("assignmentType", newAssignmentType);
+      fd.append("allowedLanguages", JSON.stringify(allowedLanguages));
+      if (newAssignmentType === "code") {
+        if (newStarterCode) fd.append("starterCode", newStarterCode);
+        if (newSampleInput) fd.append("sampleInput", newSampleInput);
+        if (newExpectedOutput) fd.append("expectedOutput", newExpectedOutput);
+      }
       for (let i = 0; i < newFiles.length; i++) {
         fd.append("files", newFiles[i]);
       }
@@ -291,6 +355,11 @@ export default function TeacherDashboard() {
         visibility: "classroom",
         classroomId: selectedClassroomId,
         sectionId: newSectionId || undefined,
+        assignmentType: newAssignmentType,
+        allowedLanguages: allowedLanguages,
+        starterCode: newAssignmentType === "code" ? newStarterCode || undefined : undefined,
+        sampleInput: newAssignmentType === "code" ? newSampleInput || undefined : undefined,
+        expectedOutput: newAssignmentType === "code" ? newExpectedOutput || undefined : undefined,
       });
     }
   };
@@ -413,13 +482,47 @@ export default function TeacherDashboard() {
                           Post Classroom Assignment
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="border-border/50 bg-card/90 backdrop-blur-md max-w-md w-full">
+                      <DialogContent className="border-border/50 bg-card/90 backdrop-blur-md max-w-xl w-full max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle className="text-xl font-bold flex items-center">
                             <CheckSquare className="w-5 h-5 text-primary mr-2" />
                             Post New Classroom Assignment
                           </DialogTitle>
                         </DialogHeader>
+
+                        {/* Assignment Type Selector */}
+                        <div className="grid grid-cols-2 gap-2 p-1 bg-muted/40 rounded-lg border border-border/50 mt-2">
+                          <button
+                            type="button"
+                            onClick={() => setNewAssignmentType("document")}
+                            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-semibold transition-all ${
+                              newAssignmentType === "document"
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <FileIcon className="w-4 h-4" />
+                            Standard Document
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewAssignmentType("code");
+                              if (!newStarterCode) {
+                                setNewStarterCode(CODE_STARTERS[newAllowedLanguage] || CODE_STARTERS.all);
+                              }
+                            }}
+                            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-semibold transition-all ${
+                              newAssignmentType === "code"
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <Code2 className="w-4 h-4" />
+                            Code Assignment
+                          </button>
+                        </div>
+
                         <form onSubmit={handleCreateAssignment} className="space-y-4 mt-2">
                           <div className="space-y-1">
                             <label className="text-xs font-semibold text-muted-foreground">Select Classroom *</label>
@@ -437,107 +540,199 @@ export default function TeacherDashboard() {
                             </select>
                           </div>
 
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-muted-foreground">Assignment Title *</label>
-                            <Input
-                              placeholder="e.g. Midterm Lab Assignment"
-                              value={newTitle}
-                              onChange={(e) => setNewTitle(e.target.value)}
-                              required
-                            />
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold text-muted-foreground">Assignment Title *</label>
+                              <Input
+                                placeholder={newAssignmentType === "code" ? "e.g. Binary Search & Tree Traversal Lab" : "e.g. Midterm Lab Assignment"}
+                                value={newTitle}
+                                onChange={(e) => setNewTitle(e.target.value)}
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold text-muted-foreground">Subject Code *</label>
+                              <Input
+                                placeholder="e.g. CSE-402"
+                                value={newSubject}
+                                onChange={(e) => setNewSubject(e.target.value)}
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold text-muted-foreground">Due Date *</label>
+                              <Input
+                                type="date"
+                                value={newDueDate}
+                                onChange={(e) => setNewDueDate(e.target.value)}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold text-muted-foreground">Priority</label>
+                              <select
+                                value={newPriority}
+                                onChange={(e) => setNewPriority(e.target.value as any)}
+                                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                              >
+                                <option value="low">Low Priority</option>
+                                <option value="medium">Medium Priority</option>
+                                <option value="high">High Priority</option>
+                              </select>
+                            </div>
                           </div>
 
                           <div className="space-y-1">
-                            <label className="text-xs font-semibold text-muted-foreground">Subject Code *</label>
-                            <Input
-                              placeholder="e.g. CSE-402"
-                              value={newSubject}
-                              onChange={(e) => setNewSubject(e.target.value)}
-                              required
+                            <label className="text-xs font-semibold text-muted-foreground">Target Section</label>
+                            <Select value={newSectionId} onValueChange={setNewSectionId}>
+                              <SelectTrigger className="w-full bg-card border-border/60">
+                                <SelectValue placeholder="All Sections" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-card border-border">
+                                <SelectItem value="">All Sections</SelectItem>
+                                {(classrooms || []).find((c: any) => c._id === selectedClassroomId)?.sections?.map((s: any) => (
+                                  <SelectItem key={s._id} value={s._id}>
+                                    {s.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-muted-foreground">
+                              {newAssignmentType === "code" ? "Problem Statement & Requirements *" : "Description / Prompt"}
+                            </label>
+                            <textarea
+                              placeholder={
+                                newAssignmentType === "code"
+                                  ? "Specify problem statement, input/output specifications, time complexity, and grading criteria..."
+                                  : "Describe what students need to upload and grade requirements..."
+                              }
+                              value={newDescription}
+                              onChange={(e) => setNewDescription(e.target.value)}
+                              className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary h-20 resize-none"
+                              required={newAssignmentType === "code"}
                             />
                           </div>
-                          <div className="space-y-1">
-                          <label className="text-xs font-semibold text-muted-foreground">Due Date *</label>
-                          <Input
-                            type="date"
-                            value={newDueDate}
-                            onChange={(e) => setNewDueDate(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-muted-foreground">Priority</label>
-                          <select
-                            value={newPriority}
-                            onChange={(e) => setNewPriority(e.target.value as any)}
-                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                          >
-                            <option value="low">Low Priority</option>
-                            <option value="medium">Medium Priority</option>
-                            <option value="high">High Priority</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-muted-foreground">Description / Prompt</label>
-                          <textarea
-                            placeholder="Describe what students need to upload and grade requirements..."
-                            value={newDescription}
-                            onChange={(e) => setNewDescription(e.target.value)}
-                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary h-20 resize-none"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-muted-foreground">Target Section</label>
-                          <Select value={newSectionId} onValueChange={setNewSectionId}>
-                            <SelectTrigger className="w-full bg-card border-border/60">
-                              <SelectValue placeholder="All Sections" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card border-border">
-                              <SelectItem value="">All Sections</SelectItem>
-                              {(classrooms || []).find((c: any) => c._id === selectedClassroomId)?.sections?.map((s: any) => (
-                                <SelectItem key={s._id} value={s._id}>
-                                  {s.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
 
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-muted-foreground">Attach PDF(s)</label>
-                          <input
-                            type="file"
-                            accept="application/pdf"
-                            multiple
-                            onChange={(e) => setNewFiles(e.target.files)}
-                            className="w-full"
-                          />
-                        </div>
-                        <DialogFooter className="pt-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsCreateAssignmentOpen(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            type="submit"
-                            disabled={createAssignmentMutation.isPending}
-                            className="bg-gradient-to-r from-primary to-secondary"
-                          >
-                            {createAssignmentMutation.isPending ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Posting...
-                              </>
-                            ) : (
-                              "Create & Notify"
-                            )}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
+                          {/* Code Assignment Configuration Section */}
+                          {newAssignmentType === "code" && (
+                            <div className="space-y-3 p-3.5 rounded-lg bg-background/60 border border-border/60">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                                  <Code2 className="w-4 h-4" />
+                                  Compiler & Starter Code Setup
+                                </span>
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-muted-foreground">Allowed Programming Language</label>
+                                <select
+                                  value={newAllowedLanguage}
+                                  onChange={(e) => {
+                                    const lang = e.target.value as any;
+                                    setNewAllowedLanguage(lang);
+                                    if (CODE_STARTERS[lang]) {
+                                      setNewStarterCode(CODE_STARTERS[lang]);
+                                    }
+                                  }}
+                                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                  <option value="all">All Supported Languages (C, Python, Java)</option>
+                                  <option value="python">Python 3</option>
+                                  <option value="c">C (GCC)</option>
+                                  <option value="java">Java (JDK)</option>
+                                </select>
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs font-semibold text-muted-foreground">Starter / Boilerplate Code</label>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setNewStarterCode(CODE_STARTERS[newAllowedLanguage] || CODE_STARTERS.all)}
+                                    className="h-6 text-[10px] text-primary px-2 hover:bg-primary/10"
+                                  >
+                                    Load Default Template
+                                  </Button>
+                                </div>
+                                <textarea
+                                  value={newStarterCode}
+                                  onChange={(e) => setNewStarterCode(e.target.value)}
+                                  placeholder="// Optional starter boilerplate provided to student..."
+                                  className="w-full bg-slate-950 text-slate-100 font-mono border border-border rounded-md p-3 text-xs placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary h-28 resize-none leading-relaxed"
+                                  spellCheck={false}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-xs font-semibold text-muted-foreground">Sample Input (stdin)</label>
+                                  <textarea
+                                    value={newSampleInput}
+                                    onChange={(e) => setNewSampleInput(e.target.value)}
+                                    placeholder="e.g. 5\n10 20 30 40 50"
+                                    className="w-full bg-background border border-border rounded-md p-2 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary h-16 resize-none"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-xs font-semibold text-muted-foreground">Sample Expected Output</label>
+                                  <textarea
+                                    value={newExpectedOutput}
+                                    onChange={(e) => setNewExpectedOutput(e.target.value)}
+                                    placeholder="e.g. 150"
+                                    className="w-full bg-background border border-border rounded-md p-2 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary h-16 resize-none"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-muted-foreground">
+                              {newAssignmentType === "code" ? "Attach Problem Spec / PDF (Optional)" : "Attach PDF(s) (Optional)"}
+                            </label>
+                            <input
+                              type="file"
+                              accept="application/pdf,.doc,.docx"
+                              multiple
+                              onChange={(e) => setNewFiles(e.target.files)}
+                              className="w-full text-xs"
+                            />
+                          </div>
+
+                          <DialogFooter className="pt-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsCreateAssignmentOpen(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="submit"
+                              disabled={createAssignmentMutation.isPending}
+                              className="bg-gradient-to-r from-primary to-secondary"
+                            >
+                              {createAssignmentMutation.isPending ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Posting...
+                                </>
+                              ) : (
+                                "Create & Notify"
+                              )}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
                   </Dialog>
                 ) : (
                   <Link
@@ -810,6 +1005,7 @@ export default function TeacherDashboard() {
                         <TableHeader>
                           <TableRow className="border-border/40">
                             <TableHead>Title</TableHead>
+                            <TableHead>Type</TableHead>
                             <TableHead>Subject Code</TableHead>
                             <TableHead>Due Date</TableHead>
                             <TableHead>Priority</TableHead>
@@ -818,53 +1014,87 @@ export default function TeacherDashboard() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {assignments.map((assignment: any) => (
-                            <TableRow key={assignment._id} className="border-border/30">
-                              <TableCell className="font-semibold">{assignment.title}</TableCell>
-                              <TableCell className="font-mono text-xs text-muted-foreground">{assignment.subject}</TableCell>
-                              <TableCell className="text-xs">{new Date(assignment.dueDate).toLocaleDateString()}</TableCell>
-                              <TableCell className="capitalize text-xs font-medium">
-                                <span className={
-                                  assignment.priority === "high" ? "text-destructive" :
-                                  assignment.priority === "medium" ? "text-warning" : "text-muted-foreground"
-                                }>
-                                  {assignment.priority}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${
-                                  assignment.assignmentStatus === "closed"
-                                    ? "bg-destructive/15 border-destructive/25 text-destructive"
-                                    : "bg-success/15 border-success/25 text-success"
-                                }`}>
-                                  {assignment.assignmentStatus === "closed" ? "Closed 🔒" : "Active 🔓"}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="w-full flex items-center justify-end gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleToggleAssignmentStatus(assignment)}
-                                    className="h-8 border-border/40 hover:bg-muted text-xs"
-                                  >
-                                    {assignment.assignmentStatus === "closed" ? (
-                                      <>
-                                        <Unlock className="w-3.5 h-3.5 mr-1 text-success" />
-                                        Open Submissions
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Lock className="w-3.5 h-3.5 mr-1 text-destructive" />
-                                        Close Submissions
-                                      </>
+                          {assignments.map((assignment: any) => {
+                            const isCode = assignment.assignmentType === "code";
+                            return (
+                              <TableRow key={assignment._id} className="border-border/30">
+                                <TableCell className="font-semibold">
+                                  <div className="space-y-0.5">
+                                    <span className="font-semibold text-foreground">{assignment.title}</span>
+                                    {isCode && assignment.allowedLanguages && (
+                                      <p className="text-[10px] text-muted-foreground font-mono">
+                                        Lang: {assignment.allowedLanguages.join(", ")}
+                                      </p>
                                     )}
-                                  </Button>
-
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {isCode ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary font-bold">
+                                      <Code2 className="w-3 h-3" />
+                                      Code
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-muted border border-border/60 text-muted-foreground font-semibold">
+                                      <FileIcon className="w-3 h-3" />
+                                      Doc
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="font-mono text-xs text-muted-foreground">{assignment.subject}</TableCell>
+                                <TableCell className="text-xs">{new Date(assignment.dueDate).toLocaleDateString()}</TableCell>
+                                <TableCell className="capitalize text-xs font-medium">
+                                  <span className={
+                                    assignment.priority === "high" ? "text-destructive" :
+                                    assignment.priority === "medium" ? "text-warning" : "text-muted-foreground"
+                                  }>
+                                    {assignment.priority}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${
+                                    assignment.assignmentStatus === "closed"
+                                      ? "bg-destructive/15 border-destructive/25 text-destructive"
+                                      : "bg-success/15 border-success/25 text-success"
+                                  }`}>
+                                    {assignment.assignmentStatus === "closed" ? "Closed 🔒" : "Active 🔓"}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="w-full flex items-center justify-end gap-2">
+                                    {isCode && (
+                                      <Link
+                                        href={`/compiler?assignmentId=${assignment._id}`}
+                                        className="inline-flex items-center justify-center rounded-md border text-xs font-semibold h-8 px-2.5 border-primary/40 text-primary hover:bg-primary/10 transition-colors"
+                                        title="Open in Code Compiler"
+                                      >
+                                        <Code2 className="w-3.5 h-3.5 mr-1" />
+                                        Compiler
+                                      </Link>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleToggleAssignmentStatus(assignment)}
+                                      className="h-8 border-border/40 hover:bg-muted text-xs"
+                                    >
+                                      {assignment.assignmentStatus === "closed" ? (
+                                        <>
+                                          <Unlock className="w-3.5 h-3.5 mr-1 text-success" />
+                                          Open Submissions
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Lock className="w-3.5 h-3.5 mr-1 text-destructive" />
+                                          Close Submissions
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     )}

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   CheckSquare,
@@ -34,12 +35,14 @@ import {
   Upload,
   Lock,
   BookOpen,
+  Code2,
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 
 export default function Assignments() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const addToast = useToastStore((state) => state.addToast);
@@ -128,7 +131,6 @@ export default function Assignments() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["assignments"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
-      triggerToast("Assignment Created", `Successfully added "${data.title}"`, "success");
       setIsAddOpen(false);
       // Reset form
       setNewTitle("");
@@ -136,6 +138,13 @@ export default function Assignments() {
       setNewDescription("");
       setNewDueDate("");
       setNewPriority("medium");
+
+      if (data?.assignmentType === "code" && (data._id || data.id)) {
+        triggerToast("Code Assignment Created", "Redirecting to online code compiler...", "success");
+        router.push(`/compiler?assignmentId=${data._id || data.id}`);
+      } else {
+        triggerToast("Assignment Created", `Successfully added "${data.title}"`, "success");
+      }
     },
     onError: (err: any) => {
       triggerToast("Creation Failed", err.response?.data?.message || "An error occurred.", "destructive");
@@ -604,6 +613,13 @@ export default function Assignments() {
                                     {assignment.subject}
                                   </span>
 
+                                  {assignment.assignmentType === "code" ? (
+                                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary font-bold flex items-center">
+                                      <Code2 className="w-3.5 h-3.5 mr-1" />
+                                      CODE LAB
+                                    </span>
+                                  ) : null}
+
                                   {isClassroom ? (
                                     <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-secondary/15 border border-secondary/25 text-secondary font-bold flex items-center">
                                       <BookOpen className="w-3.5 h-3.5 mr-1" />
@@ -767,6 +783,26 @@ export default function Assignments() {
                                           <span className="text-xs text-success flex items-center font-bold">
                                             <Check className="w-4 h-4 mr-1" /> Graded
                                           </span>
+                                        ) : assignment.assignmentType === "code" ? (
+                                          <div className="flex items-center gap-2">
+                                            <Link
+                                              href={`/compiler?assignmentId=${assignment._id || assignment.id}`}
+                                              className="inline-flex items-center justify-center rounded-md bg-gradient-to-r from-primary to-secondary text-xs h-8 px-3 font-semibold text-primary-foreground shadow-sm hover:opacity-90 transition-opacity"
+                                            >
+                                              <Code2 className="w-3.5 h-3.5 mr-1.5" />
+                                              {studentSubmission?.submittedCode ? "Open in Compiler" : "Solve in Compiler"}
+                                            </Link>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => handleOpenSubmit(assignment)}
+                                              className="text-xs h-8 border-border/50 text-muted-foreground hover:text-foreground"
+                                              title="Upload documentation or PDF"
+                                            >
+                                              <Upload className="w-3.5 h-3.5 mr-1" />
+                                              Upload
+                                            </Button>
+                                          </div>
                                         ) : (
                                           <Button
                                             variant="default"
@@ -782,18 +818,30 @@ export default function Assignments() {
                                     )}
 
                                     {user?.role === "teacher" && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => {
-                                          if (confirm("Are you sure you want to delete this classroom assignment? It will delete all student submissions.")) {
-                                            deleteMutation.mutate(assignment._id || assignment.id);
-                                          }
-                                        }}
-                                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </Button>
+                                      <div className="flex items-center gap-2">
+                                        {assignment.assignmentType === "code" && (
+                                          <Link
+                                            href={`/compiler?assignmentId=${assignment._id || assignment.id}`}
+                                            className="inline-flex items-center justify-center rounded-md border text-xs font-semibold h-8 px-2.5 border-primary/40 text-primary hover:bg-primary/10 transition-colors"
+                                            title="Open in Code Compiler"
+                                          >
+                                            <Code2 className="w-3.5 h-3.5 mr-1" />
+                                            Compiler
+                                          </Link>
+                                        )}
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => {
+                                            if (confirm("Are you sure you want to delete this classroom assignment? It will delete all student submissions.")) {
+                                              deleteMutation.mutate(assignment._id || assignment.id);
+                                            }
+                                          }}
+                                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
                                     )}
                                   </>
                                 )}

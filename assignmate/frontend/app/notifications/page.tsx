@@ -17,6 +17,8 @@ import {
   Award,
   FileText,
   Clock,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -66,6 +68,36 @@ export default function NotificationsPage() {
     },
   });
 
+  // 4. Delete Single Notification Mutation
+  const deleteNotificationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.delete(`/notifications/${id}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      triggerToast("Removed", "Notification removed.", "success");
+    },
+    onError: (err: any) => {
+      triggerToast("Error", err.response?.data?.message || "Failed to remove notification.", "destructive");
+    },
+  });
+
+  // 5. Clear All Notifications Mutation
+  const clearAllNotificationsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.delete("/notifications/clear/all");
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      triggerToast("Cleared", "All notifications have been removed.", "success");
+    },
+    onError: (err: any) => {
+      triggerToast("Error", err.response?.data?.message || "Failed to clear notifications.", "destructive");
+    },
+  });
+
   // Icon selector based on title keywords
   const getNotificationIcon = (title: string) => {
     const t = title.toLowerCase();
@@ -80,6 +112,9 @@ export default function NotificationsPage() {
     }
     return <Bell className="w-5 h-5 text-muted-foreground" />;
   };
+
+  const unreadCount = notifications?.filter((n: any) => !n.read).length || 0;
+  const hasNotifications = notifications && notifications.length > 0;
 
   return (
     <ProtectedRoute>
@@ -101,17 +136,44 @@ export default function NotificationsPage() {
                   </p>
                 </div>
 
-                {notifications && notifications.filter((n: any) => !n.read).length > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => markAllReadMutation.mutate()}
-                    disabled={markAllReadMutation.isPending}
-                    className="border-border/40 hover:bg-muted font-semibold"
-                  >
-                    <CheckCheck className="w-4 h-4 mr-2" />
-                    Mark all as read
-                  </Button>
+                {hasNotifications && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {unreadCount > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => markAllReadMutation.mutate()}
+                        disabled={markAllReadMutation.isPending}
+                        className="border-border/40 hover:bg-muted font-semibold text-xs"
+                      >
+                        {markAllReadMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <CheckCheck className="w-3.5 h-3.5 mr-1.5" />
+                        )}
+                        Mark all as read
+                      </Button>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to remove all notifications?")) {
+                          clearAllNotificationsMutation.mutate();
+                        }
+                      }}
+                      disabled={clearAllNotificationsMutation.isPending}
+                      className="border-border/40 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 font-semibold text-xs transition-colors"
+                    >
+                      {clearAllNotificationsMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      Clear all notifications
+                    </Button>
+                  </div>
                 )}
               </div>
 
@@ -121,7 +183,7 @@ export default function NotificationsPage() {
                   <div>
                     <CardTitle className="text-lg font-bold">Inbox</CardTitle>
                     <CardDescription>
-                      {notifications?.filter((n: any) => !n.read).length || 0} unread notifications
+                      {unreadCount} unread notification{unreadCount === 1 ? "" : "s"}
                     </CardDescription>
                   </div>
                 </CardHeader>
@@ -132,7 +194,7 @@ export default function NotificationsPage() {
                       <Skeleton className="h-16 w-full" />
                       <Skeleton className="h-16 w-full" />
                     </div>
-                  ) : !notifications || notifications.length === 0 ? (
+                  ) : !hasNotifications ? (
                     <div className="p-12 text-center text-muted-foreground">
                       <Bell className="w-12 h-12 opacity-25 mx-auto mb-4" />
                       <h3 className="text-lg font-semibold mb-1">Clean inbox!</h3>
@@ -146,22 +208,23 @@ export default function NotificationsPage() {
                         {notifications.map((notif: any) => (
                           <motion.div
                             key={notif._id}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
                             className={`p-5 flex items-start justify-between gap-4 transition-colors ${
                               notif.read ? "bg-card/25" : "bg-primary/5 hover:bg-primary/10"
                             }`}
                           >
-                            <div className="flex items-start space-x-4">
-                              <div className={`p-2.5 rounded-lg border ${
+                            <div className="flex items-start space-x-4 flex-1">
+                              <div className={`p-2.5 rounded-lg border shrink-0 ${
                                 notif.read
                                   ? "bg-muted/50 border-border/40 text-muted-foreground"
                                   : "bg-primary/10 border-primary/20 text-primary"
                               }`}>
                                 {getNotificationIcon(notif.title)}
                               </div>
-                              <div className="space-y-1">
+                              <div className="space-y-1 flex-1">
                                 <p className={`text-sm ${notif.read ? "text-foreground/85" : "font-bold text-foreground"}`}>
                                   {notif.title}
                                 </p>
@@ -175,17 +238,36 @@ export default function NotificationsPage() {
                               </div>
                             </div>
 
-                            {!notif.read && (
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {!notif.read && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted border border-border/30"
+                                  onClick={() => markReadMutation.mutate(notif._id)}
+                                  disabled={markReadMutation.isPending}
+                                  title="Mark as read"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </Button>
+                              )}
+
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted border border-border/30"
-                                onClick={() => markReadMutation.mutate(notif._id)}
-                                disabled={markReadMutation.isPending}
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 border border-border/30 transition-colors"
+                                onClick={() => deleteNotificationMutation.mutate(notif._id)}
+                                disabled={deleteNotificationMutation.isPending}
+                                title="Remove notification"
                               >
-                                <Check className="w-4 h-4" />
+                                {deleteNotificationMutation.isPending && deleteNotificationMutation.variables === notif._id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                )}
                               </Button>
-                            )}
+                            </div>
                           </motion.div>
                         ))}
                       </AnimatePresence>

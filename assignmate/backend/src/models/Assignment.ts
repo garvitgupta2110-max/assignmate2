@@ -15,6 +15,11 @@ export interface IAssignment extends Document {
   classroomId?: mongoose.Types.ObjectId;
   targetSectionId?: mongoose.Types.ObjectId;
   assignmentStatus: "active" | "closed";
+  assignmentType?: "document" | "code";
+  allowedLanguages?: string[];
+  starterCode?: string;
+  sampleInput?: string;
+  expectedOutput?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -81,6 +86,24 @@ const assignmentSchema = new Schema<IAssignment>(
       type: String,
       enum: ["active", "closed"],
       default: "active",
+    },
+    assignmentType: {
+      type: String,
+      enum: ["document", "code"],
+      default: "document",
+    },
+    allowedLanguages: {
+      type: [String],
+      default: ["c", "python", "java"],
+    },
+    starterCode: {
+      type: String,
+    },
+    sampleInput: {
+      type: String,
+    },
+    expectedOutput: {
+      type: String,
     },
   },
   { timestamps: true }

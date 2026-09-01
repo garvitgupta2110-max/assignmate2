@@ -20,12 +20,17 @@ export interface ToastStore {
   updateToast: (toast: Toast) => void
 }
 
-export const useToastStore = create<ToastStore>((set) => ({
+export const useToastStore = create<ToastStore>((set, get) => ({
   toasts: [],
-  addToast: (toast) =>
+  addToast: (toast) => {
+    const id = toast.id || Math.random().toString(36).substring(2, 9);
     set((state) => ({
-      toasts: [{ ...toast, id: toast.id || Math.random().toString(36).substring(2, 9) }, ...state.toasts].slice(0, 1),
-    })),
+      toasts: [{ ...toast, id, open: true }, ...state.toasts.filter((t) => t.id !== id)].slice(0, 3),
+    }));
+    setTimeout(() => {
+      get().removeToast(id);
+    }, 5000);
+  },
   removeToast: (id) =>
     set((state) => ({
       toasts: state.toasts.filter((toast) => toast.id !== id),

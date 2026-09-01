@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
@@ -8,7 +9,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToastStore } from "@/store/toast-store";
 import api from "@/lib/api";
-import { Play, RotateCcw, Terminal, Code2, AlertTriangle, ShieldCheck, Clock, Loader2 } from "lucide-react";
+import {
+  Play,
+  RotateCcw,
+  Terminal,
+  Code2,
+  AlertTriangle,
+  ShieldCheck,
+  Clock,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  BookOpen,
+  Info,
+} from "lucide-react";
 
 const TEMPLATES = {
   c: `#include <stdio.h>
@@ -30,25 +45,31 @@ print("Hello, CVSync Python Compiler!")
         System.out.println("Hello, CVSync Java Compiler!");
     }
 }
-`
+`,
 };
 
-export default function CompilerPage() {
+function CompilerContent() {
+  const searchParams = useSearchParams();
+  const initialAssignmentId = searchParams.get("assignmentId") || "";
+
   const addToast = useToastStore((state) => state.addToast);
 
   const [language, setLanguage] = useState<"c" | "python" | "java">("python");
   const [code, setCode] = useState<string>(TEMPLATES.python);
   const [stdin, setStdin] = useState<string>("");
   const [output, setOutput] = useState<string>("");
-  const [status, setStatus] = useState<"idle" | "running" | "success" | "compile-error" | "runtime-error" | "timeout">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "running" | "success" | "compile-error" | "runtime-error" | "timeout"
+  >("idle");
 
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
 
   const [assignments, setAssignments] = useState<any[]>([]);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>("");
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>(initialAssignmentId);
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [isTestActive, setIsTestActive] = useState(false);
+  const [isProblemInfoOpen, setIsProblemInfoOpen] = useState(true);
 
   // Refs to maintain latest state inside event listeners without re-binding
   const codeRef = useRef(code);
@@ -56,12 +77,35 @@ export default function CompilerPage() {
   const selectedAssignmentIdRef = useRef(selectedAssignmentId);
   const isTestActiveRef = useRef(isTestActive);
 
-  useEffect(() => { codeRef.current = code; }, [code]);
-  useEffect(() => { languageRef.current = language; }, [language]);
-  useEffect(() => { selectedAssignmentIdRef.current = selectedAssignmentId; }, [selectedAssignmentId]);
-  useEffect(() => { isTestActiveRef.current = isTestActive; }, [isTestActive]);
+  useEffect(() => {
+    codeRef.current = code;
+  }, [code]);
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
+  useEffect(() => {
+    selectedAssignmentIdRef.current = selectedAssignmentId;
+  }, [selectedAssignmentId]);
+  useEffect(() => {
+    isTestActiveRef.current = isTestActive;
+  }, [isTestActive]);
 
-  const handleAutoSubmitAssignment = async (currentCode: string, currentLang: string, assignmentId: string) => {
+  const activeAssignment = assignments.find(
+    (a) => (a._id || a.id) === selectedAssignmentId
+  );
+
+  const getAttachmentUrl = (attachmentPath: string) => {
+    if (!attachmentPath) return "#";
+    if (/^https?:\/\//i.test(attachmentPath)) return attachmentPath;
+    const apiRoot = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/api$/, "");
+    return `${apiRoot}${attachmentPath.startsWith("/") ? attachmentPath : `/${attachmentPath}`}`;
+  };
+
+  const handleAutoSubmitAssignment = async (
+    currentCode: string,
+    currentLang: string,
+    assignmentId: string
+  ) => {
     if (typeof document !== "undefined" && document.fullscreenElement && document.exitFullscreen) {
       document.exitFullscreen().catch(() => {});
     }
@@ -73,8 +117,9 @@ export default function CompilerPage() {
 
       addToast({
         title: "Test Auto-Submitted (3/3 Attempts Used)",
-        description: "All 3 allowed attempts were exceeded due to tab/window switching. Your test has been submitted and locked.",
-        type: "error",
+        description:
+          "All 3 allowed attempts were exceeded due to tab/window switching. Your test has been submitted and locked.",
+        variant: "destructive",
       });
     } catch (err: any) {
       console.error("Auto-submit failure:", err);
@@ -104,8 +149,9 @@ export default function CompilerPage() {
 
           addToast({
             title: "Proctoring Lockout (3/3 Attempts Used)",
-            description: "All 3 allowed attempts have been exceeded due to window/tab switching. The editor has been locked.",
-            type: "error",
+            description:
+              "All 3 allowed attempts have been exceeded due to window/tab switching. The editor has been locked.",
+            variant: "destructive",
           });
 
           setIsLocked(true);
@@ -114,8 +160,10 @@ export default function CompilerPage() {
           const remaining = 3 - nextCount;
           addToast({
             title: `Security Warning (Attempt ${nextCount}/3)`,
-            description: `External window, portal, or tab switch detected! You have ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before your code is auto-submitted and locked.`,
-            type: "warning",
+            description: `External window, portal, or tab switch detected! You have ${remaining} attempt${
+              remaining === 1 ? "" : "s"
+            } remaining before your code is auto-submitted and locked.`,
+            variant: "default",
           });
           return nextCount;
         }
@@ -135,12 +183,34 @@ export default function CompilerPage() {
           (a: any) => a.visibility === "classroom" && a.assignmentStatus === "active"
         );
         setAssignments(activeClassroomAssignments);
+
+        // If URL param assignmentId was provided, auto setup template
+        if (initialAssignmentId) {
+          const matched = activeClassroomAssignments.find(
+            (a: any) => (a._id || a.id) === initialAssignmentId
+          );
+          if (matched) {
+            setSelectedAssignmentId(matched._id || matched.id);
+            if (matched.allowedLanguages && matched.allowedLanguages.length === 1) {
+              const singleLang = matched.allowedLanguages[0] as "c" | "python" | "java";
+              if (["c", "python", "java"].includes(singleLang)) {
+                setLanguage(singleLang);
+              }
+            }
+            if (matched.starterCode) {
+              setCode(matched.starterCode);
+            }
+            if (matched.sampleInput) {
+              setStdin(matched.sampleInput);
+            }
+          }
+        }
       } catch (err) {
         console.error("Failed to load assignments in compiler:", err);
       }
     };
     fetchAssignments();
-  }, []);
+  }, [initialAssignmentId]);
 
   const handleSelectAssignment = (assignmentId: string) => {
     if (!assignmentId) {
@@ -148,14 +218,39 @@ export default function CompilerPage() {
       setIsTestActive(false);
       return;
     }
-    
+
+    const matched = assignments.find((a) => (a._id || a.id) === assignmentId);
     setSelectedAssignmentId(assignmentId);
-    if (confirm("Link Assignment & Start Coding Test?\n\nThis will lock your browser in FULL-SCREEN PROCTORED MODE with full security:\n- You are allowed up to 3 attempts before your test auto-submits and locks.\n- Switching tabs, opening external windows, or exiting full-screen counts as an attempt.\n- Copy/Paste, shortcuts (Ctrl+T, Ctrl+N, F12), and right-click are disabled.")) {
+
+    if (
+      confirm(
+        `Link Assignment "${matched?.title || "Coding Test"}" & Start Coding Test?\n\nThis will lock your browser in FULL-SCREEN PROCTORED MODE with full security:\n- You are allowed up to 3 attempts before your test auto-submits and locks.\n- Switching tabs, opening external windows, or exiting full-screen counts as an attempt.\n- Copy/Paste, shortcuts (Ctrl+T, Ctrl+N, F12), and right-click are disabled.`
+      )
+    ) {
       setTabSwitchCount(0);
       setIsLocked(false);
       setIsTestActive(true);
-      // Reset template for the active language
-      setCode(TEMPLATES[language]);
+
+      let targetLang = language;
+      if (matched?.allowedLanguages && matched.allowedLanguages.length === 1) {
+        const singleLang = matched.allowedLanguages[0] as "c" | "python" | "java";
+        if (["c", "python", "java"].includes(singleLang)) {
+          targetLang = singleLang;
+          setLanguage(singleLang);
+        }
+      }
+
+      // Initialize with teacher's starter code if provided, otherwise default language template
+      if (matched?.starterCode) {
+        setCode(matched.starterCode);
+      } else {
+        setCode(TEMPLATES[targetLang]);
+      }
+
+      if (matched?.sampleInput) {
+        setStdin(matched.sampleInput);
+      }
+
       setOutput("");
       setStatus("idle");
     } else {
@@ -401,27 +496,41 @@ export default function CompilerPage() {
       <ProtectedRoute>
         <div className="fixed inset-0 bg-[#0B0F19] text-foreground z-50 flex flex-col overflow-hidden select-none">
           {/* Test Header */}
-          <div className="flex items-center justify-between px-6 py-3.5 bg-card border-b border-border">
+          <div className="flex items-center justify-between px-6 py-3 bg-card border-b border-border">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-emerald-500/10 text-emerald-500 rounded-lg flex items-center justify-center animate-pulse">
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">PROCTORED ASSIGNMENT TEST</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  PROCTORED ASSIGNMENT TEST
+                </span>
                 <h2 className="text-sm font-bold text-foreground">
-                  {assignments.find((a) => (a._id || a.id) === selectedAssignmentId)?.title}
+                  {activeAssignment?.title || "Classroom Coding Task"}
                 </h2>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold border ${
-                tabSwitchCount === 0 
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                  : tabSwitchCount === 1 
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse' 
-                  : 'bg-red-500/10 border-red-500/30 text-red-400 animate-bounce'
-              }`}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsProblemInfoOpen((prev) => !prev)}
+                className="h-8 text-xs font-semibold border-border/60 flex items-center gap-1.5"
+              >
+                <Info className="w-3.5 h-3.5 text-primary" />
+                Problem Spec {isProblemInfoOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </Button>
+
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold border ${
+                  tabSwitchCount === 0
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    : tabSwitchCount === 1
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse"
+                    : "bg-red-500/10 border-red-500/30 text-red-400 animate-bounce"
+                }`}
+              >
                 <AlertTriangle className="w-3.5 h-3.5" />
                 <span>Violations: {tabSwitchCount}/3 Attempts</span>
               </div>
@@ -438,7 +547,7 @@ export default function CompilerPage() {
                     handleReset();
                   }
                 }}
-                className="text-xs font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-9 px-3"
+                className="text-xs font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 px-3"
               >
                 Exit Test
               </Button>
@@ -446,7 +555,7 @@ export default function CompilerPage() {
               <Button
                 onClick={handleRun}
                 disabled={status === "running" || isLocked}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 flex items-center gap-2 text-xs font-bold"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3.5 flex items-center gap-2 text-xs font-bold"
               >
                 {status === "running" ? (
                   <>
@@ -464,7 +573,7 @@ export default function CompilerPage() {
               <Button
                 onClick={handleSubmitCodeAssignment}
                 disabled={isSubmittingCode || isLocked}
-                className="bg-emerald-600 text-white hover:bg-emerald-500 h-9 px-4 flex items-center gap-2 text-xs font-bold"
+                className="bg-emerald-600 text-white hover:bg-emerald-500 h-8 px-4 flex items-center gap-2 text-xs font-bold"
               >
                 {isSubmittingCode ? (
                   <>
@@ -481,10 +590,50 @@ export default function CompilerPage() {
             </div>
           </div>
 
-          {/* Test Workspace Grid (Full-height split screen) */}
+          {/* Collapsible Problem Info Banner */}
+          {isProblemInfoOpen && activeAssignment && (
+            <div className="bg-card/90 border-b border-border px-6 py-3 text-xs flex flex-col md:flex-row gap-4 justify-between items-start overflow-y-auto max-h-36">
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-foreground text-sm">{activeAssignment.title}</span>
+                  <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-mono text-[10px]">
+                    {activeAssignment.subject}
+                  </span>
+                  {activeAssignment.allowedLanguages && (
+                    <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground font-mono text-[10px]">
+                      Languages: {activeAssignment.allowedLanguages.join(", ")}
+                    </span>
+                  )}
+                </div>
+                {activeAssignment.description && (
+                  <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
+                    {activeAssignment.description}
+                  </p>
+                )}
+              </div>
+
+              {(activeAssignment.sampleInput || activeAssignment.expectedOutput) && (
+                <div className="flex gap-3 text-[11px] font-mono shrink-0">
+                  {activeAssignment.sampleInput && (
+                    <div className="bg-slate-950 p-2 rounded border border-border/60 max-w-[200px]">
+                      <span className="text-muted-foreground text-[9px] uppercase font-bold block mb-0.5">Sample Input</span>
+                      <pre className="text-slate-200 overflow-x-auto">{activeAssignment.sampleInput}</pre>
+                    </div>
+                  )}
+                  {activeAssignment.expectedOutput && (
+                    <div className="bg-slate-950 p-2 rounded border border-border/60 max-w-[200px]">
+                      <span className="text-muted-foreground text-[9px] uppercase font-bold block mb-0.5">Expected Output</span>
+                      <pre className="text-emerald-400 overflow-x-auto">{activeAssignment.expectedOutput}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Test Workspace Grid */}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 p-6 gap-6 overflow-hidden">
-            
-            {/* Massive Code Editor Block */}
+            {/* Code Editor Block */}
             <div className="lg:col-span-2 relative border border-border/60 bg-card/60 backdrop-blur-sm rounded-lg flex flex-col overflow-hidden">
               {isLocked && (
                 <div className="absolute inset-0 bg-[#0B0F19]/95 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 z-50">
@@ -493,8 +642,8 @@ export default function CompilerPage() {
                   <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-5">
                     Proctoring Alert: You switched tabs or left the browser window. The test session is locked to prevent academic plagiarism.
                   </p>
-                  <Button 
-                    variant="destructive" 
+                  <Button
+                    variant="destructive"
                     onClick={() => {
                       if (typeof document !== "undefined" && document.fullscreenElement && document.exitFullscreen) {
                         document.exitFullscreen().catch(() => {});
@@ -511,7 +660,7 @@ export default function CompilerPage() {
                   </Button>
                 </div>
               )}
-              
+
               <div className="py-2.5 px-4 bg-muted/40 border-b border-border/40 flex items-center justify-between">
                 <span className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                   <Code2 className="w-4 h-4 text-primary" />
@@ -560,13 +709,19 @@ export default function CompilerPage() {
                 <div className="py-2.5 px-4 bg-muted/40 border-b border-border/40 flex items-center justify-between">
                   <span className="text-xs font-bold text-muted-foreground uppercase">Console Output</span>
                   {status !== "idle" && status !== "running" && (
-                    <span className={`text-xs font-bold ${status === 'success' ? 'text-emerald-500' : 'text-red-400'}`}>
+                    <span
+                      className={`text-xs font-bold ${
+                        status === "success" ? "text-emerald-500" : "text-red-400"
+                      }`}
+                    >
                       {status.toUpperCase().replace("-", " ")}
                     </span>
                   )}
                 </div>
                 <div className="flex-1 p-4 bg-slate-950 font-mono text-xs overflow-y-auto whitespace-pre-wrap leading-relaxed text-slate-200">
-                  {status === "idle" && <span className="text-muted-foreground/50 italic">Console output will print here.</span>}
+                  {status === "idle" && (
+                    <span className="text-muted-foreground/50 italic">Console output will print here.</span>
+                  )}
                   {status === "running" && (
                     <div className="flex items-center gap-2 text-muted-foreground italic">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
@@ -574,14 +729,21 @@ export default function CompilerPage() {
                     </div>
                   )}
                   {status !== "idle" && status !== "running" && (
-                    <span className={status === "compile-error" ? "text-red-300 font-semibold" : status === "runtime-error" ? "text-amber-300" : "text-slate-100"}>
+                    <span
+                      className={
+                        status === "compile-error"
+                          ? "text-red-300 font-semibold"
+                          : status === "runtime-error"
+                          ? "text-amber-300"
+                          : "text-slate-100"
+                      }
+                    >
                       {output}
                     </span>
                   )}
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </ProtectedRoute>
@@ -596,7 +758,6 @@ export default function CompilerPage() {
           <Header />
           <main className="flex-1 overflow-y-auto p-8">
             <div className="max-w-6xl mx-auto space-y-6">
-              
               {/* Header block */}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -608,10 +769,12 @@ export default function CompilerPage() {
                     Write, compile, and run C, Python, and Java programs in real-time.
                   </p>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Select Language</label>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1">
+                      Select Language
+                    </label>
                     <select
                       value={language}
                       onChange={(e) => handleLanguageChange(e.target.value as any)}
@@ -661,7 +824,9 @@ export default function CompilerPage() {
                   {assignments.length > 0 && (
                     <div className="flex items-center gap-2 border-l border-border/40 pl-3">
                       <div className="flex flex-col">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Link Assignment</label>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1">
+                          Link Assignment
+                        </label>
                         <select
                           value={selectedAssignmentId}
                           onChange={(e) => handleSelectAssignment(e.target.value)}
@@ -670,7 +835,7 @@ export default function CompilerPage() {
                           <option value="">-- Select Test --</option>
                           {assignments.map((a) => (
                             <option key={a._id || a.id} value={a._id || a.id}>
-                              {a.title}
+                              {a.title} {a.assignmentType === "code" ? "💻" : "📄"}
                             </option>
                           ))}
                         </select>
@@ -698,9 +863,92 @@ export default function CompilerPage() {
                 </div>
               </div>
 
+              {/* Linked Assignment Information Box */}
+              {activeAssignment && (
+                <Card className="border-primary/40 bg-primary/5 backdrop-blur-sm">
+                  <CardHeader className="py-3 px-5 border-b border-primary/20 flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <BookOpen className="w-5 h-5 text-primary" />
+                      <div>
+                        <CardTitle className="text-base font-bold text-foreground">
+                          {activeAssignment.title}
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground">
+                          Subject: {activeAssignment.subject} | Due: {new Date(activeAssignment.dueDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30">
+                        {activeAssignment.assignmentType === "code" ? "Coding Assignment" : "Classroom Assignment"}
+                      </span>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="p-5 space-y-3 text-xs">
+                    {activeAssignment.description && (
+                      <div className="space-y-1">
+                        <span className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider">
+                          Problem Statement & Instructions
+                        </span>
+                        <p className="text-foreground whitespace-pre-line leading-relaxed bg-background/50 p-3 rounded border border-border/40">
+                          {activeAssignment.description}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                      {activeAssignment.sampleInput && (
+                        <div className="space-y-1">
+                          <span className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider">
+                            Sample Input (stdin)
+                          </span>
+                          <pre className="bg-slate-950 text-slate-100 p-2.5 rounded font-mono text-xs overflow-x-auto border border-border/40">
+                            {activeAssignment.sampleInput}
+                          </pre>
+                        </div>
+                      )}
+
+                      {activeAssignment.expectedOutput && (
+                        <div className="space-y-1">
+                          <span className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider">
+                            Expected Output
+                          </span>
+                          <pre className="bg-slate-950 text-emerald-400 p-2.5 rounded font-mono text-xs overflow-x-auto border border-border/40">
+                            {activeAssignment.expectedOutput}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+
+                    {Array.isArray(activeAssignment.attachments) && activeAssignment.attachments.length > 0 && (
+                      <div className="space-y-1 pt-1">
+                        <span className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider block">
+                          Attached Problem Documents
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {activeAssignment.attachments.map((att: string, idx: number) => (
+                            <a
+                              key={idx}
+                              href={getAttachmentUrl(att)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-card border border-border/60 text-[11px] text-primary hover:bg-primary/10 transition-colors"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>{decodeURIComponent(att.split("/").pop() || `Document ${idx + 1}`)}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Workspace Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
                 {/* Code input pane */}
                 <div className="lg:col-span-2 space-y-4">
                   <Card className="border-border/50 bg-card/60 backdrop-blur-sm flex flex-col h-[550px]">
@@ -721,8 +969,8 @@ export default function CompilerPage() {
                           <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4">
                             You switched tabs or left the browser window. Copying, pasting, and tab switching are strictly prohibited to maintain code integrity.
                           </p>
-                          <Button 
-                            variant="destructive" 
+                          <Button
+                            variant="destructive"
                             onClick={() => {
                               setIsLocked(false);
                               setTabSwitchCount(0);
@@ -810,7 +1058,9 @@ export default function CompilerPage() {
                     </CardHeader>
                     <CardContent className="p-4 bg-muted/15 flex-1 font-mono text-xs overflow-y-auto whitespace-pre-wrap leading-relaxed text-slate-200">
                       {status === "idle" && (
-                        <span className="text-muted-foreground/60 italic">Output will be displayed here after you run the code.</span>
+                        <span className="text-muted-foreground/60 italic">
+                          Output will be displayed here after you run the code.
+                        </span>
                       )}
                       {status === "running" && (
                         <div className="flex items-center gap-2 text-muted-foreground italic">
@@ -819,25 +1069,42 @@ export default function CompilerPage() {
                         </div>
                       )}
                       {status !== "idle" && status !== "running" && (
-                        <span className={
-                          status === "compile-error" ? "text-red-300 font-semibold" :
-                          status === "runtime-error" ? "text-amber-300" :
-                          status === "timeout" ? "text-red-400 font-bold" :
-                          "text-slate-100"
-                        }>
+                        <span
+                          className={
+                            status === "compile-error"
+                              ? "text-red-300 font-semibold"
+                              : status === "runtime-error"
+                              ? "text-amber-300"
+                              : status === "timeout"
+                              ? "text-red-400 font-bold"
+                              : "text-slate-100"
+                          }
+                        >
                           {output}
                         </span>
                       )}
                     </CardContent>
                   </Card>
                 </div>
-                
               </div>
-
             </div>
           </main>
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function CompilerPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-background">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <CompilerContent />
+    </Suspense>
   );
 }

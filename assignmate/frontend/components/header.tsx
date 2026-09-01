@@ -29,9 +29,11 @@ export function Header() {
         </div>
 
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon">
-            <Bell className="w-5 h-5" />
-          </Button>
+          <Link href="/notifications" title="Notifications">
+            <Button variant="ghost" size="icon" className="hover:bg-muted">
+              <Bell className="w-5 h-5" />
+            </Button>
+          </Link>
           <Link href="/settings">
             <Button
               variant="ghost"

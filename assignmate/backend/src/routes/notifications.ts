@@ -43,4 +43,40 @@ router.put("/read/all", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+// 4. Clear all notifications
+router.delete("/clear/all", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    await Notification.deleteMany({ userId: req.userId });
+    res.json({ message: "All notifications removed successfully." });
+  } catch (error: any) {
+    res.status(500).json({ message: "Failed to clear notifications: " + error.message });
+  }
+});
+
+// 5. Delete single notification
+router.delete("/:id", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const notification = await Notification.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId,
+    });
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found." });
+    }
+    res.json({ message: "Notification removed successfully.", id: req.params.id });
+  } catch (error: any) {
+    res.status(500).json({ message: "Failed to delete notification: " + error.message });
+  }
+});
+
+// 6. Delete all notifications (fallback root DELETE)
+router.delete("/", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    await Notification.deleteMany({ userId: req.userId });
+    res.json({ message: "All notifications removed successfully." });
+  } catch (error: any) {
+    res.status(500).json({ message: "Failed to clear notifications: " + error.message });
+  }
+});
+
 export default router;

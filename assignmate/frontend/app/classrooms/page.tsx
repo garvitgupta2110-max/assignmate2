@@ -18,7 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, BookOpen, Users, Copy, Check, Loader2, ArrowLeft, UploadCloud, FileText, Download, Trash2, Calendar, Paperclip, Cpu, Sparkles } from "lucide-react";
+import { Plus, BookOpen, Users, Copy, Check, Loader2, ArrowLeft, UploadCloud, FileText, Download, Trash2, Calendar, Paperclip, Cpu, Sparkles, Code2 } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -748,39 +748,60 @@ export default function ClassroomsPage() {
                     </Card>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {classroomAssignments.map((assignment: any) => (
-                        <Card key={assignment._id} className="border-border/50 bg-card/60 backdrop-blur-sm p-5 flex flex-col justify-between">
-                          <div>
-                            <div className="flex justify-between items-start">
-                              <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
-                                assignment.priority === "high"
-                                  ? "bg-red-500/10 text-red-500"
-                                  : assignment.priority === "medium"
-                                  ? "bg-amber-500/10 text-amber-500"
-                                  : "bg-slate-500/10 text-slate-500"
-                              }`}>
-                                {assignment.priority} Priority
-                              </span>
-                              <span className="text-[10px] text-muted-foreground font-semibold">
-                                Due: {new Date(assignment.dueDate).toLocaleDateString()}
-                              </span>
+                      {classroomAssignments.map((assignment: any) => {
+                        const isCode = assignment.assignmentType === "code";
+                        return (
+                          <Card key={assignment._id} className="border-border/50 bg-card/60 backdrop-blur-sm p-5 flex flex-col justify-between">
+                            <div>
+                              <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
+                                    assignment.priority === "high"
+                                      ? "bg-red-500/10 text-red-500"
+                                      : assignment.priority === "medium"
+                                      ? "bg-amber-500/10 text-amber-500"
+                                      : "bg-slate-500/10 text-slate-500"
+                                  }`}>
+                                    {assignment.priority} Priority
+                                  </span>
+                                  {isCode && (
+                                    <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-primary/15 border border-primary/25 text-primary flex items-center gap-1">
+                                      <Code2 className="w-3 h-3" />
+                                      Code
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-muted-foreground font-semibold">
+                                  Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <h3 className="font-bold text-lg mt-2 text-foreground">{assignment.title}</h3>
+                              {assignment.description && (
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-3 leading-relaxed">{assignment.description}</p>
+                              )}
                             </div>
-                            <h3 className="font-bold text-lg mt-2 text-foreground">{assignment.title}</h3>
-                            {assignment.description && (
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-3 leading-relaxed">{assignment.description}</p>
-                            )}
-                          </div>
-                          <div className="border-t border-border/40 mt-4 pt-3 flex items-center justify-between">
-                            <span className="text-[10px] text-slate-400 capitalize">Status: {assignment.assignmentStatus || "active"}</span>
-                            <Link
-                              href="/assignments"
-                              className="text-xs font-bold text-primary hover:underline"
-                            >
-                              View/Submit Work →
-                            </Link>
-                          </div>
-                        </Card>
-                      ))}
+                            <div className="border-t border-border/40 mt-4 pt-3 flex items-center justify-between">
+                              <span className="text-[10px] text-slate-400 capitalize">Status: {assignment.assignmentStatus || "active"}</span>
+                              {isCode ? (
+                                <Link
+                                  href={`/compiler?assignmentId=${assignment._id}`}
+                                  className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                                >
+                                  <Code2 className="w-3.5 h-3.5" />
+                                  Solve in Compiler →
+                                </Link>
+                              ) : (
+                                <Link
+                                  href="/assignments"
+                                  className="text-xs font-bold text-primary hover:underline"
+                                >
+                                  View/Submit Work →
+                                </Link>
+                              )}
+                            </div>
+                          </Card>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

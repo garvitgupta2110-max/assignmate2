@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useToastStore, type Toast } from "@/store/toast-store"
 
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 5000
 
 type ToasterToast = Toast
 
