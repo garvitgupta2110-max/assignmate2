@@ -23,6 +23,8 @@ import {
   FileText,
   BookOpen,
   Info,
+  Maximize2,
+  Lock,
 } from "lucide-react";
 
 const TEMPLATES = {
@@ -71,6 +73,31 @@ function CompilerContent() {
   const [isTestActive, setIsTestActive] = useState(false);
   const [isProblemInfoOpen, setIsProblemInfoOpen] = useState(true);
 
+  // Teacher-Defined Test Timer State (in seconds)
+  const [timeRemaining, setTimeRemaining] = useState<number>(3600);
+  const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
+
+  // Failed Test Cases Diagnostics State
+  const [failedCaseDetails, setFailedCaseDetails] = useState<{
+    hasFailed: boolean;
+    status: string;
+    expected: string;
+    actual: string;
+    input: string;
+  } | null>(null);
+
+  // Format seconds to HH:MM:SS or MM:SS
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hrs > 0) {
+      return `${hrs}:${mins < 10 ? "0" : ""}${mins}:${secs < 10 ? "0" : ""}${secs}`;
+    }
+    return `${mins < 10 ? "0" : ""}${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
   // Refs to maintain latest state inside event listeners without re-binding
   const codeRef = useRef(code);
   const languageRef = useRef(language);
@@ -89,6 +116,39 @@ function CompilerContent() {
   useEffect(() => {
     isTestActiveRef.current = isTestActive;
   }, [isTestActive]);
+
+  // Teacher Countdown Timer Effect
+  useEffect(() => {
+    if (!isTestActive || !isTimerRunning || isLocked) return;
+
+    const timer = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setIsTimerRunning(false);
+          if (isTestActiveRef.current && selectedAssignmentIdRef.current) {
+            handleAutoSubmitAssignment(
+              codeRef.current,
+              languageRef.current,
+              selectedAssignmentIdRef.current
+            );
+            setIsTestActive(false);
+            setSelectedAssignmentId("");
+            handleReset();
+          }
+          addToast({
+            title: "Time's Up! Test Auto-Submitted",
+            description: "The time duration set by your teacher has expired. Your solution has been submitted for grading.",
+            variant: "destructive",
+          });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isTestActive, isTimerRunning, isLocked]);
 
   const activeAssignment = assignments.find(
     (a) => (a._id || a.id) === selectedAssignmentId
@@ -173,6 +233,15 @@ function CompilerContent() {
     });
   };
 
+  const toggleFullscreen = () => {
+    if (typeof document === "undefined") return;
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
   // Load student's classroom assignments
   useEffect(() => {
     const fetchAssignments = async () => {
@@ -184,24 +253,41 @@ function CompilerContent() {
         );
         setAssignments(activeClassroomAssignments);
 
-        // If URL param assignmentId was provided, auto setup template
+        // If URL param assignmentId was provided, auto setup template and launch into locked test mode
         if (initialAssignmentId) {
           const matched = activeClassroomAssignments.find(
             (a: any) => (a._id || a.id) === initialAssignmentId
           );
           if (matched) {
             setSelectedAssignmentId(matched._id || matched.id);
+            let targetLang = language;
             if (matched.allowedLanguages && matched.allowedLanguages.length === 1) {
               const singleLang = matched.allowedLanguages[0] as "c" | "python" | "java";
               if (["c", "python", "java"].includes(singleLang)) {
+                targetLang = singleLang;
                 setLanguage(singleLang);
               }
             }
             if (matched.starterCode) {
               setCode(matched.starterCode);
+            } else {
+              setCode(TEMPLATES[targetLang]);
             }
             if (matched.sampleInput) {
               setStdin(matched.sampleInput);
+            }
+
+            // Lock and activate big screen proctored mode immediately
+            setIsTestActive(true);
+            setTabSwitchCount(0);
+            setIsLocked(false);
+
+            const durationMins = matched.timeLimitMinutes || 60;
+            setTimeRemaining(durationMins * 60);
+            setIsTimerRunning(true);
+
+            if (typeof document !== "undefined" && document.documentElement && document.documentElement.requestFullscreen) {
+              document.documentElement.requestFullscreen().catch(() => {});
             }
           }
         }
@@ -230,6 +316,10 @@ function CompilerContent() {
       setTabSwitchCount(0);
       setIsLocked(false);
       setIsTestActive(true);
+
+      const durationMins = matched?.timeLimitMinutes || 60;
+      setTimeRemaining(durationMins * 60);
+      setIsTimerRunning(true);
 
       let targetLang = language;
       if (matched?.allowedLanguages && matched.allowedLanguages.length === 1) {
@@ -268,33 +358,82 @@ function CompilerContent() {
       return;
     }
 
-    if (typeof document !== "undefined" && document.fullscreenElement && document.exitFullscreen) {
-      document.exitFullscreen().catch(() => {});
-    }
-
     setIsSubmittingCode(true);
     try {
-      await api.post(`/assignments/${selectedAssignmentId}/submit`, {
+      const response = await api.post(`/assignments/${selectedAssignmentId}/submit`, {
         submittedCode: code,
         submittedLanguage: language,
       });
 
-      addToast({
-        title: "Assignment Submitted",
-        description: "Your source code has been successfully submitted to your teacher!",
-        type: "success",
-      });
-      
-      // Reset selection and exit test view
-      setSelectedAssignmentId("");
-      setIsTestActive(false);
-      handleReset();
+      const autoEval = response.data?.autoEvaluation;
+      if (autoEval) {
+        if (autoEval.passed) {
+          setFailedCaseDetails(null);
+          addToast({
+            title: "Submission Accepted (100/100) 🏆",
+            description: "All test cases passed! Output matches teacher's expected answer perfectly.",
+            variant: "success",
+          });
+
+          if (typeof document !== "undefined" && document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
+
+          // Reset selection and exit test view
+          setSelectedAssignmentId("");
+          setIsTestActive(false);
+          setIsTimerRunning(false);
+          handleReset();
+        } else {
+          // DO NOT EXIT TEST: Keep student in test editor to fix their code!
+          setFailedCaseDetails({
+            hasFailed: true,
+            status: autoEval.status,
+            expected: autoEval.expectedOutput || activeAssignment?.expectedOutput || "",
+            actual: autoEval.actualOutput || "",
+            input: activeAssignment?.sampleInput || "",
+          });
+          setStatus("runtime-error");
+          setOutput(
+            `❌ TEST CASE EVALUATION FAILED\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `[Input (stdin)]:\n${activeAssignment?.sampleInput || "(None)"}\n\n` +
+            `[Teacher Expected Output]:\n${autoEval.expectedOutput || activeAssignment?.expectedOutput || "(None)"}\n\n` +
+            `[Your Actual Output]:\n${autoEval.actualOutput || "[No Output]"}\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `Verdict: ${autoEval.status === "output-mismatch" ? "Wrong Output (Mismatch)" : autoEval.status}\n` +
+            `Please revise your code and click Submit Test Code again.`
+          );
+
+          addToast({
+            title: "Test Cases Failed (Submission Rejected)",
+            description: "Your code output does not match the expected answer. Check the failed cases below and revise your code.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        addToast({
+          title: "Assignment Submitted",
+          description: "Your source code has been successfully submitted to your teacher!",
+          variant: "success",
+        });
+
+        if (typeof document !== "undefined" && document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+
+        // Reset selection and exit test view
+        setSelectedAssignmentId("");
+        setIsTestActive(false);
+        setIsTimerRunning(false);
+        handleReset();
+      }
     } catch (err: any) {
       console.error(err);
       addToast({
         title: "Submission Failed",
         description: err.response?.data?.message || err.message || "Failed to submit assignment.",
-        type: "error",
+        variant: "destructive",
       });
     } finally {
       setIsSubmittingCode(false);
@@ -469,6 +608,7 @@ function CompilerContent() {
   const handleRun = async () => {
     setStatus("running");
     setOutput("");
+    setFailedCaseDetails(null);
     try {
       const response = await api.post("/compiler/execute", {
         language,
@@ -479,6 +619,19 @@ function CompilerContent() {
       const { status: runStatus, output: runOutput } = response.data;
       setStatus(runStatus);
       setOutput(runOutput);
+
+      if (runStatus === "success" && activeAssignment?.expectedOutput) {
+        const normalizeOutput = (str: string) =>
+          str.replace(/\r\n/g, "\n").split("\n").map((l) => l.trimEnd()).join("\n").trim();
+        const matches = normalizeOutput(runOutput) === normalizeOutput(activeAssignment.expectedOutput);
+        if (matches) {
+          addToast({
+            title: "Test Case Output Matches! ✨",
+            description: "Your output matches the expected answer. Click Submit Test Code to record your score.",
+            variant: "success",
+          });
+        }
+      }
     } catch (err: any) {
       console.error(err);
       setStatus("runtime-error");
@@ -486,7 +639,7 @@ function CompilerContent() {
       addToast({
         title: "Execution Failed",
         description: "Could not connect to the compilation server.",
-        type: "error"
+        variant: "destructive"
       });
     }
   };
@@ -502,8 +655,9 @@ function CompilerContent() {
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                  PROCTORED ASSIGNMENT TEST
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Lock className="w-2.5 h-2.5 text-emerald-400" />
+                  LOCKED PROCTORED ASSIGNMENT
                 </span>
                 <h2 className="text-sm font-bold text-foreground">
                   {activeAssignment?.title || "Classroom Coding Task"}
@@ -520,6 +674,32 @@ function CompilerContent() {
               >
                 <Info className="w-3.5 h-3.5 text-primary" />
                 Problem Spec {isProblemInfoOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </Button>
+
+              {/* Teacher-Configured Test Timer Pill */}
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold border transition-colors ${
+                  timeRemaining <= 180
+                    ? "bg-red-500/20 border-red-500/50 text-red-400 animate-pulse"
+                    : timeRemaining <= 600
+                    ? "bg-amber-500/15 border-amber-500/40 text-amber-400"
+                    : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                }`}
+                title={`Teacher Time Limit: ${activeAssignment?.timeLimitMinutes || 60} mins`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>{formatTime(timeRemaining)}</span>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleFullscreen}
+                className="h-8 text-xs font-semibold border-border/60 flex items-center gap-1.5 hover:bg-muted"
+                title="Toggle Fullscreen Big Screen"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-primary" />
+                Big Screen
               </Button>
 
               <div
@@ -719,7 +899,51 @@ function CompilerContent() {
                   )}
                 </div>
                 <div className="flex-1 p-4 bg-slate-950 font-mono text-xs overflow-y-auto whitespace-pre-wrap leading-relaxed text-slate-200">
-                  {status === "idle" && (
+                  {/* Failed Test Cases Diagnostic Panel */}
+                  {failedCaseDetails?.hasFailed && (
+                    <div className="p-3.5 mb-3 rounded-lg bg-red-950/70 border border-red-500/50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-red-400 flex items-center gap-1.5 uppercase tracking-wide">
+                          <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                          Failed Test Case Diagnostic
+                        </span>
+                        <span className="text-[10px] font-bold bg-red-900/80 text-red-200 px-2 py-0.5 rounded uppercase">
+                          {failedCaseDetails.status === "output-mismatch" ? "Wrong Output" : failedCaseDetails.status}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2.5 text-[11px]">
+                        {failedCaseDetails.input && (
+                          <div>
+                            <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">Input (stdin):</span>
+                            <pre className="bg-black/60 p-2 rounded text-slate-200 overflow-x-auto whitespace-pre-wrap border border-slate-800">
+                              {failedCaseDetails.input}
+                            </pre>
+                          </div>
+                        )}
+
+                        <div>
+                          <span className="text-emerald-400 text-[10px] uppercase font-bold block mb-1">Expected Output:</span>
+                          <pre className="bg-black/60 p-2 rounded text-emerald-300 overflow-x-auto whitespace-pre-wrap border border-emerald-950">
+                            {failedCaseDetails.expected || "[None Specified]"}
+                          </pre>
+                        </div>
+
+                        <div>
+                          <span className="text-red-400 text-[10px] uppercase font-bold block mb-1">Your Output:</span>
+                          <pre className="bg-black/60 p-2 rounded text-red-300 overflow-x-auto whitespace-pre-wrap border border-red-950">
+                            {failedCaseDetails.actual || "[No Output]"}
+                          </pre>
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] text-red-300/80 italic pt-1 border-t border-red-900/50">
+                        Fix the discrepancy above and click <strong>Submit Test Code</strong> to submit your solution.
+                      </p>
+                    </div>
+                  )}
+
+                  {status === "idle" && !failedCaseDetails && (
                     <span className="text-muted-foreground/50 italic">Console output will print here.</span>
                   )}
                   {status === "running" && (
@@ -728,7 +952,7 @@ function CompilerContent() {
                       Running compilation...
                     </div>
                   )}
-                  {status !== "idle" && status !== "running" && (
+                  {status !== "idle" && status !== "running" && !failedCaseDetails && (
                     <span
                       className={
                         status === "compile-error"

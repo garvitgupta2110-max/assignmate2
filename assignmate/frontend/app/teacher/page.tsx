@@ -105,6 +105,7 @@ export default function TeacherDashboard() {
   const [newStarterCode, setNewStarterCode] = useState<string>("");
   const [newSampleInput, setNewSampleInput] = useState<string>("");
   const [newExpectedOutput, setNewExpectedOutput] = useState<string>("");
+  const [newTimeLimit, setNewTimeLimit] = useState<string>("60");
 
   const CODE_STARTERS: Record<string, string> = {
     python: `# Python 3 Solution Template
@@ -257,6 +258,7 @@ public class Main {
       setNewStarterCode("");
       setNewSampleInput("");
       setNewExpectedOutput("");
+      setNewTimeLimit("60");
 
       if (isCode && createdId) {
         triggerToast("Code Assignment Posted", "Redirecting to online code compiler...", "success");
@@ -337,6 +339,7 @@ public class Main {
       fd.append("assignmentType", newAssignmentType);
       fd.append("allowedLanguages", JSON.stringify(allowedLanguages));
       if (newAssignmentType === "code") {
+        fd.append("timeLimitMinutes", newTimeLimit || "60");
         if (newStarterCode) fd.append("starterCode", newStarterCode);
         if (newSampleInput) fd.append("sampleInput", newSampleInput);
         if (newExpectedOutput) fd.append("expectedOutput", newExpectedOutput);
@@ -357,6 +360,7 @@ public class Main {
         sectionId: newSectionId || undefined,
         assignmentType: newAssignmentType,
         allowedLanguages: allowedLanguages,
+        timeLimitMinutes: newAssignmentType === "code" ? Number(newTimeLimit) || 60 : undefined,
         starterCode: newAssignmentType === "code" ? newStarterCode || undefined : undefined,
         sampleInput: newAssignmentType === "code" ? newSampleInput || undefined : undefined,
         expectedOutput: newAssignmentType === "code" ? newExpectedOutput || undefined : undefined,
@@ -648,6 +652,45 @@ public class Main {
                                   <option value="c">C (GCC)</option>
                                   <option value="java">Java (JDK)</option>
                                 </select>
+                              </div>
+
+                              {/* Test Time Limit / Duration */}
+                              <div className="space-y-1.5 p-2.5 rounded-md bg-card/60 border border-border/50">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5 text-primary" />
+                                    Test Time Limit (Teacher Duration)
+                                  </label>
+                                  <div className="flex gap-1">
+                                    {["15", "30", "45", "60", "90", "120"].map((mins) => (
+                                      <button
+                                        key={mins}
+                                        type="button"
+                                        onClick={() => setNewTimeLimit(mins)}
+                                        className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                                          newTimeLimit === mins
+                                            ? "bg-primary text-primary-foreground border-primary font-bold"
+                                            : "bg-background border-border/60 text-muted-foreground hover:text-foreground"
+                                        }`}
+                                      >
+                                        {mins}m
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={720}
+                                    value={newTimeLimit}
+                                    onChange={(e) => setNewTimeLimit(e.target.value)}
+                                    placeholder="60"
+                                    className="bg-background border-border/60 text-xs h-8"
+                                    required={newAssignmentType === "code"}
+                                  />
+                                  <span className="text-xs font-mono text-muted-foreground shrink-0">minutes</span>
+                                </div>
                               </div>
 
                               <div className="space-y-1">
@@ -1030,10 +1073,16 @@ public class Main {
                                 </TableCell>
                                 <TableCell>
                                   {isCode ? (
-                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary font-bold">
-                                      <Code2 className="w-3 h-3" />
-                                      Code
-                                    </span>
+                                    <div className="flex flex-col gap-1 items-start">
+                                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary font-bold">
+                                        <Code2 className="w-3 h-3" />
+                                        Code Lab
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-muted/80 text-muted-foreground font-mono">
+                                        <Clock className="w-2.5 h-2.5" />
+                                        {assignment.timeLimitMinutes || 60} mins
+                                      </span>
+                                    </div>
                                   ) : (
                                     <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-muted border border-border/60 text-muted-foreground font-semibold">
                                       <FileIcon className="w-3 h-3" />
@@ -1174,9 +1223,20 @@ public class Main {
                                 </TableCell>
                                 <TableCell>
                                   {isGraded ? (
-                                    <span className="font-mono font-bold text-sm bg-primary/10 border border-primary/20 px-2 py-0.5 rounded text-primary">
-                                      {sub.marks}/{sub.maxMarks} ({sub.gradeLetter})
-                                    </span>
+                                    <div className="flex flex-col gap-1 items-start">
+                                      <span className="font-mono font-bold text-sm bg-primary/10 border border-primary/20 px-2 py-0.5 rounded text-primary">
+                                        {sub.marks}/{sub.maxMarks} ({sub.gradeLetter})
+                                      </span>
+                                      {sub.isAutoEvaluated && (
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                          sub.autoEvaluationPassed
+                                            ? "bg-success/15 border-success/30 text-success"
+                                            : "bg-destructive/15 border-destructive/30 text-destructive"
+                                        }`}>
+                                          {sub.autoEvaluationPassed ? "Auto-Graded: 100/100 🏆" : "Auto-Graded: 0/100 ❌"}
+                                        </span>
+                                      )}
+                                    </div>
                                   ) : (
                                     <span className="text-xs text-muted-foreground">Unevaluated</span>
                                   )}
@@ -1313,8 +1373,45 @@ public class Main {
                       {activeSubmission.submittedLanguage}
                     </span>
                   </label>
-                  <div className="rounded border border-border bg-slate-950 p-4 max-h-[300px] overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-100 whitespace-pre-wrap select-text">
+                  <div className="rounded border border-border bg-slate-950 p-4 max-h-[220px] overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-100 whitespace-pre-wrap select-text">
                     <code>{activeSubmission.submittedCode}</code>
+                  </div>
+                </div>
+              )}
+
+              {/* Automated Code Evaluation Report */}
+              {activeSubmission && activeSubmission.isAutoEvaluated && (
+                <div className="p-4 rounded-lg border border-border/50 bg-background/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Code2 className="w-4 h-4 text-primary" />
+                      Automated Code Test Evaluation
+                    </h4>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                      activeSubmission.autoEvaluationPassed
+                        ? "bg-success/15 border-success/30 text-success"
+                        : "bg-destructive/15 border-destructive/30 text-destructive"
+                    }`}>
+                      {activeSubmission.autoEvaluationPassed ? "Passed (100/100)" : "Failed (0/100)"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+                    <div className="p-3 rounded border border-border/40 bg-slate-950">
+                      <span className="text-muted-foreground text-[10px] uppercase font-bold block mb-1">Expected Output</span>
+                      <pre className="text-emerald-400 overflow-x-auto text-[11px] max-h-24 whitespace-pre-wrap">
+                        {activeSubmission.autoEvaluationExpected || "[None Specified]"}
+                      </pre>
+                    </div>
+
+                    <div className="p-3 rounded border border-border/40 bg-slate-950">
+                      <span className="text-muted-foreground text-[10px] uppercase font-bold block mb-1">Actual Student Output</span>
+                      <pre className={`overflow-x-auto text-[11px] max-h-24 whitespace-pre-wrap ${
+                        activeSubmission.autoEvaluationPassed ? "text-emerald-400" : "text-destructive"
+                      }`}>
+                        {activeSubmission.autoEvaluationOutput || "[No Output]"}
+                      </pre>
+                    </div>
                   </div>
                 </div>
               )}

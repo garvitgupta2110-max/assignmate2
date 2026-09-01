@@ -27,6 +27,10 @@ export interface ISubmission extends Document {
   aiExplanation?: string;
   submittedCode?: string;
   submittedLanguage?: string;
+  isAutoEvaluated?: boolean;
+  autoEvaluationPassed?: boolean;
+  autoEvaluationOutput?: string;
+  autoEvaluationExpected?: string;
   gradedBy?: mongoose.Types.ObjectId;
   gradedAt?: Date;
   createdAt: Date;
@@ -99,6 +103,18 @@ const submissionSchema = new Schema<ISubmission>(
       type: String,
     },
     submittedLanguage: {
+      type: String,
+    },
+    isAutoEvaluated: {
+      type: Boolean,
+    },
+    autoEvaluationPassed: {
+      type: Boolean,
+    },
+    autoEvaluationOutput: {
+      type: String,
+    },
+    autoEvaluationExpected: {
       type: String,
     },
     gradedBy: {

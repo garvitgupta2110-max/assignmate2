@@ -36,6 +36,7 @@ import {
   Lock,
   BookOpen,
   Code2,
+  Clock,
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -614,10 +615,16 @@ export default function Assignments() {
                                   </span>
 
                                   {assignment.assignmentType === "code" ? (
-                                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary font-bold flex items-center">
-                                      <Code2 className="w-3.5 h-3.5 mr-1" />
-                                      CODE LAB
-                                    </span>
+                                    <>
+                                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary font-bold flex items-center">
+                                        <Code2 className="w-3.5 h-3.5 mr-1" />
+                                        CODE LAB
+                                      </span>
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/80 border border-border/50 text-muted-foreground font-mono font-medium flex items-center">
+                                        <Clock className="w-3 h-3 mr-1 text-primary" />
+                                        {assignment.timeLimitMinutes || 60}m test
+                                      </span>
+                                    </>
                                   ) : null}
 
                                   {isClassroom ? (

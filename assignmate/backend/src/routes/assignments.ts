@@ -5,6 +5,7 @@ import { Classroom } from "../models/Classroom";
 import { Submission } from "../models/Submission";
 import { Notification } from "../models/Notification";
 import { analyzeSubmissionDocument } from "../utils/aiDetector";
+import { executeCode } from "./compiler";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -101,6 +102,7 @@ router.post("/", authMiddleware, upload.array("files", 6), async (req: AuthReque
       starterCode,
       sampleInput,
       expectedOutput,
+      timeLimitMinutes,
     } = req.body;
 
     let parsedAllowedLanguages: string[] = ["c", "python", "java"];
@@ -134,6 +136,7 @@ router.post("/", authMiddleware, upload.array("files", 6), async (req: AuthReque
       starterCode: starterCode || undefined,
       sampleInput: sampleInput || undefined,
       expectedOutput: expectedOutput || undefined,
+      timeLimitMinutes: timeLimitMinutes ? Number(timeLimitMinutes) : 60,
     };
 
     if (visibility === "classroom") {
@@ -288,10 +291,6 @@ router.post("/:id/submit", authMiddleware, upload.array("files", 6), async (req:
       }
     }
 
-    const now = new Date();
-    const isLate = now > new Date(assignment.dueDate);
-    const status = isLate ? "late" : "submitted";
-
     const { submittedCode, submittedLanguage } = req.body;
 
     if (submittedCode && parsedAttachments.length === 0 && uploadedFiles.length === 0) {
@@ -302,6 +301,82 @@ router.post("/:id/submit", authMiddleware, upload.array("files", 6), async (req:
         fileType: submittedLanguage || "python",
         fileSize: Buffer.byteLength(submittedCode, 'utf-8'),
       });
+    }
+
+    // AUTO-EVALUATION FOR CODE ASSIGNMENTS
+    let autoEvaluationResult: {
+      isAutoEvaluated: boolean;
+      passed: boolean;
+      status: string;
+      actualOutput: string;
+      expectedOutput?: string;
+      marks?: number;
+      feedback?: string;
+    } | null = null;
+
+    if (submittedCode) {
+      const input = assignment.sampleInput || "";
+      const expected = (assignment.expectedOutput || "").trim();
+
+      try {
+        const execResult = await executeCode({
+          language: (submittedLanguage as any) || (assignment.allowedLanguages?.[0] as any) || "python",
+          code: submittedCode,
+          stdin: input,
+        });
+
+        const actual = execResult.output.trim();
+
+        // Normalize whitespace and line endings for fair comparison
+        const normalizeOutput = (str: string) =>
+          str.replace(/\r\n/g, "\n").split("\n").map((l) => l.trimEnd()).join("\n").trim();
+
+        const isExactMatch =
+          execResult.status === "success" &&
+          (expected === "" || normalizeOutput(actual) === normalizeOutput(expected));
+
+        if (isExactMatch) {
+          autoEvaluationResult = {
+            isAutoEvaluated: true,
+            passed: true,
+            status: "success",
+            actualOutput: actual,
+            expectedOutput: expected,
+            marks: 100,
+            feedback: "Auto-Evaluation Passed: All test cases matched the expected output perfectly!",
+          };
+        } else if (execResult.status === "success") {
+          autoEvaluationResult = {
+            isAutoEvaluated: true,
+            passed: false,
+            status: "output-mismatch",
+            actualOutput: actual,
+            expectedOutput: expected,
+            marks: 0,
+            feedback: `Auto-Evaluation Failed (Output Mismatch):\n\nExpected Output:\n${expected || "[None]"}\n\nActual Output:\n${actual}`,
+          };
+        } else {
+          autoEvaluationResult = {
+            isAutoEvaluated: true,
+            passed: false,
+            status: execResult.status,
+            actualOutput: execResult.output,
+            expectedOutput: expected,
+            marks: 0,
+            feedback: `Auto-Evaluation Failed (${execResult.status}):\n${execResult.output}`,
+          };
+        }
+      } catch (err: any) {
+        console.error("Auto-evaluation execution failed:", err);
+      }
+    }
+
+    const now = new Date();
+    const isLate = now > new Date(assignment.dueDate);
+    let status: "pending" | "submitted" | "late" | "graded" = isLate ? "late" : "submitted";
+
+    if (autoEvaluationResult) {
+      status = "graded";
     }
 
     let submission = await Submission.findOne({
@@ -324,6 +399,23 @@ router.post("/:id/submit", authMiddleware, upload.array("files", 6), async (req:
         submission.aiScore = analysisResult.aiScore;
         submission.aiExplanation = analysisResult.aiExplanation;
       }
+      if (autoEvaluationResult) {
+        submission.isAutoEvaluated = true;
+        submission.autoEvaluationPassed = autoEvaluationResult.passed;
+        submission.autoEvaluationOutput = autoEvaluationResult.actualOutput;
+        submission.autoEvaluationExpected = autoEvaluationResult.expectedOutput;
+        submission.marks = autoEvaluationResult.marks || 0;
+        submission.maxMarks = 100;
+        submission.percentage = autoEvaluationResult.marks || 0;
+        submission.gradeLetter = autoEvaluationResult.passed ? "A" : "F";
+        submission.gradedAt = now;
+        if (autoEvaluationResult.feedback) {
+          submission.feedbackHistory.push({
+            feedback: autoEvaluationResult.feedback,
+            createdAt: now,
+          });
+        }
+      }
       await submission.save();
     } else {
       submission = new Submission({
@@ -340,7 +432,22 @@ router.post("/:id/submit", authMiddleware, upload.array("files", 6), async (req:
           isAiGenerated: analysisResult.isAiGenerated,
           aiScore: analysisResult.aiScore,
           aiExplanation: analysisResult.aiExplanation,
-        } : {})
+        } : {}),
+        ...(autoEvaluationResult ? {
+          isAutoEvaluated: true,
+          autoEvaluationPassed: autoEvaluationResult.passed,
+          autoEvaluationOutput: autoEvaluationResult.actualOutput,
+          autoEvaluationExpected: autoEvaluationResult.expectedOutput,
+          marks: autoEvaluationResult.marks || 0,
+          maxMarks: 100,
+          percentage: autoEvaluationResult.marks || 0,
+          gradeLetter: autoEvaluationResult.passed ? "A" : "F",
+          gradedAt: now,
+          feedbackHistory: autoEvaluationResult.feedback ? [{
+            feedback: autoEvaluationResult.feedback,
+            createdAt: now,
+          }] : [],
+        } : {}),
       });
       await submission.save();
     }
@@ -355,15 +462,20 @@ router.post("/:id/submit", authMiddleware, upload.array("files", 6), async (req:
     const classroom = await Classroom.findById(assignment.classroomId);
     if (classroom) {
       const studentUser = await Classroom.db.model("User").findById(req.userId);
+      const evalNote = autoEvaluationResult ? ` (Auto-Evaluated: ${autoEvaluationResult.passed ? "100/100 Passed" : "0/100 Failed"})` : "";
       const notification = new Notification({
         userId: classroom.teacherId,
         title: "Assignment Submitted",
-        message: `${studentUser?.name || "A student"} submitted work for "${assignment.title}" in ${classroom.name}.`
+        message: `${studentUser?.name || "A student"} submitted work for "${assignment.title}" in ${classroom.name}.${evalNote}`
       });
       await notification.save();
     }
 
-    res.json({ message: "Assignment submitted successfully", submission });
+    res.json({
+      message: "Assignment submitted successfully",
+      submission,
+      autoEvaluation: autoEvaluationResult,
+    });
   } catch (error: any) {
     res.status(500).json({ message: "Error submitting assignment: " + error.message });
   }

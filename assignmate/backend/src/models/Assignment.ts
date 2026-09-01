@@ -20,6 +20,7 @@ export interface IAssignment extends Document {
   starterCode?: string;
   sampleInput?: string;
   expectedOutput?: string;
+  timeLimitMinutes?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -104,6 +105,10 @@ const assignmentSchema = new Schema<IAssignment>(
     },
     expectedOutput: {
       type: String,
+    },
+    timeLimitMinutes: {
+      type: Number,
+      default: 60,
     },
   },
   { timestamps: true }

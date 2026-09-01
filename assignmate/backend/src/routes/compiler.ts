@@ -13,17 +13,24 @@ if (!fs.existsSync(TEMP_DIR)) {
   fs.mkdirSync(TEMP_DIR, { recursive: true });
 }
 
-interface ExecuteRequest {
+export interface ExecuteRequest {
   language: "c" | "python" | "java";
   code: string;
   stdin?: string;
 }
 
-router.post("/execute", authMiddleware, async (req: AuthRequest, res) => {
-  const { language, code, stdin = "" } = req.body as ExecuteRequest;
+export interface ExecutionResult {
+  status: "success" | "compile-error" | "runtime-error" | "timeout";
+  output: string;
+}
 
+export async function executeCode({
+  language,
+  code,
+  stdin = "",
+}: ExecuteRequest): Promise<ExecutionResult> {
   if (!language || !code) {
-    return res.status(400).json({ message: "Language and code are required." });
+    throw new Error("Language and code are required.");
   }
 
   const runId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -61,7 +68,7 @@ router.post("/execute", authMiddleware, async (req: AuthRequest, res) => {
       compileCmd = `javac "${filePath}"`;
       runCmd = `java -cp "${workingDir}" ${className}`;
     } else {
-      return res.status(400).json({ message: "Unsupported language." });
+      throw new Error("Unsupported language.");
     }
 
     const execOptions = {
@@ -90,35 +97,38 @@ router.post("/execute", authMiddleware, async (req: AuthRequest, res) => {
     // Pipe stdin from file to handle multi-line inputs properly on Windows & Linux
     const finalCmd = `${runCmd} < "${stdinFilePath}"`;
 
-    exec(finalCmd, execOptions, (error, stdout, stderr) => {
-      // Clean up files in the background
-      setTimeout(() => {
-        try {
-          fs.rmSync(workingDir, { recursive: true, force: true });
-        } catch (err) {
-          console.error("Cleanup error:", err);
-        }
-      }, 1000);
+    return await new Promise<ExecutionResult>((resolve) => {
+      exec(finalCmd, execOptions, (error, stdout, stderr) => {
+        // Clean up files in the background
+        setTimeout(() => {
+          try {
+            if (fs.existsSync(workingDir)) {
+              fs.rmSync(workingDir, { recursive: true, force: true });
+            }
+          } catch (cleanupErr) {
+            console.error("Cleanup error:", cleanupErr);
+          }
+        }, 1000);
 
-      if (error) {
-        if (error.killed) {
-          return res.json({
-            status: "timeout",
-            output: "Execution Time Limit Exceeded (6s limit).",
+        if (error) {
+          if (error.killed) {
+            return resolve({
+              status: "timeout",
+              output: "Execution Time Limit Exceeded (6s limit).",
+            });
+          }
+          return resolve({
+            status: "runtime-error",
+            output: stderr || error.message,
           });
         }
-        return res.json({
-          status: "runtime-error",
-          output: stderr || error.message,
-        });
-      }
 
-      res.json({
-        status: "success",
-        output: stdout || stderr || "[No Output]",
+        resolve({
+          status: "success",
+          output: stdout || stderr || "[No Output]",
+        });
       });
     });
-
   } catch (err: any) {
     // Cleanup on error
     try {
@@ -130,12 +140,27 @@ router.post("/execute", authMiddleware, async (req: AuthRequest, res) => {
     }
 
     if (err.type === "compile") {
-      return res.json({
+      return {
         status: "compile-error",
         output: err.message,
-      });
+      };
     }
 
+    throw err;
+  }
+}
+
+router.post("/execute", authMiddleware, async (req: AuthRequest, res) => {
+  const { language, code, stdin = "" } = req.body as ExecuteRequest;
+
+  if (!language || !code) {
+    return res.status(400).json({ message: "Language and code are required." });
+  }
+
+  try {
+    const result = await executeCode({ language, code, stdin });
+    res.json(result);
+  } catch (err: any) {
     console.error("Executor failure:", err);
     res.status(500).json({ message: err.message || "Failed to execute code." });
   }
