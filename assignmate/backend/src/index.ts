@@ -120,8 +120,9 @@ app.use("/api/compiler", compilerRoutes);
 const startServer = async () => {
   try {
     await connectDB();
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+    const port = Number(process.env.PORT) || 5000;
+    app.listen(port, "0.0.0.0", () => {
+      console.log(`Server running on port ${port} (0.0.0.0)`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
