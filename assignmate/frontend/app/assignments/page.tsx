@@ -360,8 +360,8 @@ export default function Assignments() {
                     <RefreshCw className={`w-4 h-4 ${isRefetching ? "animate-spin" : ""}`} />
                   </Button>
 
-                  {/* AI Planner Dialog */}
-                  {user?.role === "student" && (
+                  {/* AI Planner Dialog - Disabled for students */}
+                  {false && user?.role === "student" && (
                     <Dialog open={isAiOpen} onOpenChange={setIsAiOpen}>
                       <DialogTrigger asChild>
                         <Button className="bg-gradient-to-r from-secondary to-purple-600 border border-secondary/35 text-white">
@@ -428,8 +428,8 @@ export default function Assignments() {
                     </Link>
                   )}
 
-                  {/* Manual Assignment - personal tasks for students */}
-                  {user?.role === "student" && (
+                  {/* Manual Assignment - personal tasks for students - Disabled */}
+                  {false && user?.role === "student" && (
                     <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
                       <DialogTrigger asChild>
                         <Button className="bg-gradient-to-r from-primary to-secondary">

@@ -20,6 +20,13 @@ export interface ISubmission extends Document {
     feedback: string;
     createdAt: Date;
   }>;
+  isHandwritten?: boolean;
+  handwrittenExplanation?: string;
+  isAiGenerated?: boolean;
+  aiScore?: number;
+  aiExplanation?: string;
+  submittedCode?: string;
+  submittedLanguage?: string;
   gradedBy?: mongoose.Types.ObjectId;
   gradedAt?: Date;
   createdAt: Date;
@@ -73,6 +80,27 @@ const submissionSchema = new Schema<ISubmission>(
         createdAt: { type: Date, default: Date.now },
       },
     ],
+    isHandwritten: {
+      type: Boolean,
+    },
+    handwrittenExplanation: {
+      type: String,
+    },
+    isAiGenerated: {
+      type: Boolean,
+    },
+    aiScore: {
+      type: Number,
+    },
+    aiExplanation: {
+      type: String,
+    },
+    submittedCode: {
+      type: String,
+    },
+    submittedLanguage: {
+      type: String,
+    },
     gradedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

@@ -14,6 +14,8 @@ import aiRoutes from "./routes/ai";
 import classroomRoutes from "./routes/classrooms";
 import submissionRoutes from "./routes/submissions";
 import notificationRoutes from "./routes/notifications";
+import materialsRoutes from "./routes/materials";
+import compilerRoutes from "./routes/compiler";
 import path from "path";
 
 dotenv.config();
@@ -111,6 +113,8 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/classrooms", classroomRoutes);
 app.use("/api/submissions", submissionRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/materials", materialsRoutes);
+app.use("/api/compiler", compilerRoutes);
 
 // Connect to database and start server
 const startServer = async () => {

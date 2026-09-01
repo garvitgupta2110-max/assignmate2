@@ -8,7 +8,7 @@ export function Toaster() {
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, open, onOpenChange, variant, ...props }) {
+      {toasts.map(function ({ id, title, description, action, open, onOpenChange, variant, type: _type, ...props }) {
         return (
           <Toast
             key={id}

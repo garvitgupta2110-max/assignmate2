@@ -14,6 +14,7 @@ import {
   Sparkles,
   BookOpen,
   GraduationCap,
+  Code2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -39,7 +40,8 @@ export function Sidebar() {
       menuItems.push(
         { icon: CheckSquare, label: "Assignments", href: "/assignments" },
         { icon: GraduationCap, label: "Teacher Portal", href: "/teacher" },
-        { icon: BookOpen, label: "My Classrooms", href: "/classrooms" }
+        { icon: BookOpen, label: "My Classrooms", href: "/classrooms" },
+        { icon: Code2, label: "Code Compiler", href: "/compiler" }
       );
     } else {
       menuItems.push(
@@ -49,7 +51,8 @@ export function Sidebar() {
         { icon: Calendar, label: "Timetable", href: "/timetable" },
         { icon: Presentation, label: "Presentations", href: "/presentations" },
         { icon: FileText, label: "Resume Builder", href: "/resume" },
-        { icon: Clock, label: "Calendar", href: "/calendar" }
+        { icon: Clock, label: "Calendar", href: "/calendar" },
+        { icon: Code2, label: "Code Compiler", href: "/compiler" }
       );
     }
   }

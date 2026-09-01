@@ -1,25 +1,33 @@
-
-FROM node:18-alpine
+FROM node:18-bookworm-slim
 
 WORKDIR /app
+
+# Install Python, C/C++ compiler and Java
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python-is-python3 \
+    gcc \
+    g++ \
+    default-jdk \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install --production=false
+RUN npm install
 
 # Copy source code
 COPY . .
 
-# Build the application
+# Build application
 RUN npm run build
 
-# Remove dev dependencies for production
+# Remove dev dependencies
 RUN npm prune --production
 
-# Expose port
+# Port
 EXPOSE 5000
 
-# Start the server
+# Start server
 CMD ["npm", "start"]

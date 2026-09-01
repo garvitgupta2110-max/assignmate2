@@ -59,6 +59,9 @@ docker-compose.override.yml
 tmp
 temp
 *.tmp
+*.tsbuildinfo
+backend/uploads/
+uploads/
 
 # IDE specific
 .vscode/settings.json

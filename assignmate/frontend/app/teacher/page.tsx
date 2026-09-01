@@ -63,6 +63,9 @@ import {
   Activity,
   Loader2,
   FolderOpen,
+  Bot,
+  CheckCircle,
+  Code2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -838,7 +841,7 @@ export default function TeacherDashboard() {
                                 </span>
                               </TableCell>
                               <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-2">
+                                <div className="w-full flex items-center justify-end gap-2">
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -1017,28 +1020,51 @@ export default function TeacherDashboard() {
                 <label className="text-xs font-semibold text-muted-foreground block">Submitted Files & Attachments</label>
                 {activeSubmission.submittedAttachments && activeSubmission.submittedAttachments.length > 0 ? (
                   <div className="grid grid-cols-1 gap-2">
-                    {activeSubmission.submittedAttachments.map((file: any, index: number) => (
-                      <a
-                        key={index}
-                        href={getAttachmentUrl(file.url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between p-2.5 rounded border border-border bg-card hover:bg-muted/50 hover:border-primary/50 transition-colors"
-                      >
-                        <div className="flex items-center space-x-2.5 overflow-hidden">
-                          <FileIcon className="w-5 h-5 text-primary flex-shrink-0" />
-                          <div className="overflow-hidden">
-                            <p className="text-xs font-semibold truncate text-foreground">{file.fileName}</p>
-                            <p className="text-[9px] text-slate-500 uppercase tracking-wide">
-                              {file.fileType} {file.fileSize ? `| ${(file.fileSize / 1024).toFixed(1)} KB` : ""}
-                            </p>
+                    {activeSubmission.submittedAttachments.map((file: any, index: number) => {
+                      if (file.url === "code-editor") {
+                        return (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2.5 rounded border border-border bg-card/45 cursor-default"
+                          >
+                            <div className="flex items-center space-x-2.5 overflow-hidden">
+                              <Code2 className="w-5 h-5 text-primary flex-shrink-0 animate-pulse" />
+                              <div className="overflow-hidden">
+                                <p className="text-xs font-semibold truncate text-foreground">{file.fileName}</p>
+                                <p className="text-[9px] text-slate-500 uppercase tracking-wide">
+                                  Compiler Submission | {file.fileType}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-primary font-bold px-2 py-0.5 bg-primary/10 rounded">
+                              Source Code
+                            </span>
                           </div>
-                        </div>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 font-semibold text-[10px] hover:text-primary">
-                          Open File
-                        </Button>
-                      </a>
-                    ))}
+                        );
+                      }
+                      return (
+                        <a
+                          key={index}
+                          href={getAttachmentUrl(file.url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between p-2.5 rounded border border-border bg-card hover:bg-muted/50 hover:border-primary/50 transition-colors"
+                        >
+                          <div className="flex items-center space-x-2.5 overflow-hidden">
+                            <FileIcon className="w-5 h-5 text-primary flex-shrink-0" />
+                            <div className="overflow-hidden">
+                              <p className="text-xs font-semibold truncate text-foreground">{file.fileName}</p>
+                              <p className="text-[9px] text-slate-500 uppercase tracking-wide">
+                                {file.fileType} {file.fileSize ? `| ${(file.fileSize / 1024).toFixed(1)} KB` : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 font-semibold text-[10px] hover:text-primary">
+                            Open File
+                          </Button>
+                        </a>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-xs text-warning flex items-center">
@@ -1047,6 +1073,68 @@ export default function TeacherDashboard() {
                   </p>
                 )}
               </div>
+
+              {/* Code Submission Code Viewer */}
+              {activeSubmission.submittedCode && (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground block flex items-center justify-between">
+                    <span>Submitted Source Code</span>
+                    <span className="text-[10px] bg-primary/20 text-primary font-bold px-2 py-0.5 rounded capitalize">
+                      {activeSubmission.submittedLanguage}
+                    </span>
+                  </label>
+                  <div className="rounded border border-border bg-slate-950 p-4 max-h-[300px] overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-100 whitespace-pre-wrap select-text">
+                    <code>{activeSubmission.submittedCode}</code>
+                  </div>
+                </div>
+              )}
+
+              {/* AI & Handwriting Detection Report */}
+              {activeSubmission && (activeSubmission.isHandwritten !== undefined || activeSubmission.isAiGenerated !== undefined) && (
+                <div className="p-4 rounded-lg border border-border/50 bg-background/50 space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Bot className="w-4 h-4 text-primary" />
+                    AI & Handwriting Verification
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+                    <div className="p-3 rounded border border-border/40 bg-card/45">
+                      <span className="text-muted-foreground font-semibold block mb-1">Handwriting Check</span>
+                      {activeSubmission.isHandwritten ? (
+                        <div className="flex items-center gap-1.5 text-success font-bold">
+                          <CheckCircle className="w-4 h-4" />
+                          Verified Handwritten
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-destructive font-bold">
+                          <AlertTriangle className="w-4 h-4" />
+                          Digital / Printed Text Detected
+                        </div>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">
+                        {activeSubmission.handwrittenExplanation || "No description provided."}
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded border border-border/40 bg-card/45">
+                      <span className="text-muted-foreground font-semibold block mb-1">AI Plagiarism Check</span>
+                      {activeSubmission.isAiGenerated ? (
+                        <div className="flex items-center gap-1.5 text-destructive font-bold">
+                          <AlertTriangle className="w-4 h-4" />
+                          AI Generated ({activeSubmission.aiScore}%)
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-success font-bold">
+                          <CheckCircle className="w-4 h-4" />
+                          Human Written ({100 - (activeSubmission.aiScore || 0)}% human)
+                        </div>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">
+                        {activeSubmission.aiExplanation || "No analysis provided."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Feedback History Log */}
               {activeSubmission.feedbackHistory && activeSubmission.feedbackHistory.length > 0 && (

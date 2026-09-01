@@ -4,6 +4,7 @@ import { Assignment } from "../models/Assignment";
 import { Classroom } from "../models/Classroom";
 import { Submission } from "../models/Submission";
 import { Notification } from "../models/Notification";
+import { analyzeSubmissionDocument } from "../utils/aiDetector";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -218,9 +219,51 @@ router.post("/:id/submit", authMiddleware, upload.array("files", 6), async (req:
       parsedAttachments = [...parsedAttachments, ...fileAttachments];
     }
 
+    // Run AI & handwriting detection on the first uploaded file if present
+    let analysisResult = null;
+    if (uploadedFiles.length > 0) {
+      const firstFile = uploadedFiles[0];
+      const fileExt = path.extname(firstFile.originalname).replace(".", "").toLowerCase();
+      analysisResult = await analyzeSubmissionDocument(
+        firstFile.path,
+        firstFile.originalname,
+        fileExt
+      );
+
+      // BLOCK SUBMISSION IF AI-GENERATED
+      if (analysisResult && analysisResult.isAiGenerated) {
+        // Clean up uploaded files from disk
+        uploadedFiles.forEach(f => {
+          if (fs.existsSync(f.path)) {
+            try {
+              fs.unlinkSync(f.path);
+            } catch (err) {
+              console.error("Failed to delete blocked AI file:", err);
+            }
+          }
+        });
+
+        return res.status(400).json({ 
+          message: `Submission Blocked: AI-generated text detected (${analysisResult.aiScore}% confidence). Please submit original, human-written work.` 
+        });
+      }
+    }
+
     const now = new Date();
     const isLate = now > new Date(assignment.dueDate);
     const status = isLate ? "late" : "submitted";
+
+    const { submittedCode, submittedLanguage } = req.body;
+
+    if (submittedCode && parsedAttachments.length === 0 && uploadedFiles.length === 0) {
+      const ext = submittedLanguage === "python" ? "py" : submittedLanguage === "c" ? "c" : "java";
+      parsedAttachments.push({
+        fileName: `solution.${ext}`,
+        url: "code-editor",
+        fileType: submittedLanguage || "python",
+        fileSize: Buffer.byteLength(submittedCode, 'utf-8'),
+      });
+    }
 
     let submission = await Submission.findOne({
       assignmentId: assignment._id,
@@ -231,6 +274,17 @@ router.post("/:id/submit", authMiddleware, upload.array("files", 6), async (req:
       submission.submittedAttachments = parsedAttachments;
       submission.submittedAt = now;
       submission.status = status;
+      if (submittedCode) {
+        submission.submittedCode = submittedCode;
+        submission.submittedLanguage = submittedLanguage;
+      }
+      if (analysisResult) {
+        submission.isHandwritten = analysisResult.isHandwritten;
+        submission.handwrittenExplanation = analysisResult.handwrittenExplanation;
+        submission.isAiGenerated = analysisResult.isAiGenerated;
+        submission.aiScore = analysisResult.aiScore;
+        submission.aiExplanation = analysisResult.aiExplanation;
+      }
       await submission.save();
     } else {
       submission = new Submission({
@@ -239,6 +293,15 @@ router.post("/:id/submit", authMiddleware, upload.array("files", 6), async (req:
         submittedAttachments: parsedAttachments,
         submittedAt: now,
         status: status,
+        submittedCode,
+        submittedLanguage,
+        ...(analysisResult ? {
+          isHandwritten: analysisResult.isHandwritten,
+          handwrittenExplanation: analysisResult.handwrittenExplanation,
+          isAiGenerated: analysisResult.isAiGenerated,
+          aiScore: analysisResult.aiScore,
+          aiExplanation: analysisResult.aiExplanation,
+        } : {})
       });
       await submission.save();
     }

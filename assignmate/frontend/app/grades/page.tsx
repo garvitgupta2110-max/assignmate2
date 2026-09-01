@@ -32,6 +32,8 @@ import {
   MessageSquare,
   Calendar,
   AlertCircle,
+  Bot,
+  AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -348,6 +350,9 @@ export default function StudentGradesPage() {
                         const isGraded = sub.status === "graded";
                         const isExpanded = expandedSubId === sub._id;
                         const assignment = sub.assignmentId || {};
+                        const hasFeedback = sub.feedbackHistory && sub.feedbackHistory.length > 0;
+                        const hasAnalysis = sub.isHandwritten !== undefined || sub.isAiGenerated !== undefined;
+                        const canExpand = hasFeedback || hasAnalysis;
 
                         return (
                           <div
@@ -417,7 +422,7 @@ export default function StudentGradesPage() {
                                   )}
                                 </div>
 
-                                {isGraded && sub.feedbackHistory && sub.feedbackHistory.length > 0 && (
+                                {canExpand && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -436,7 +441,7 @@ export default function StudentGradesPage() {
 
                             {/* Collapsible Feedback logs */}
                             <AnimatePresence initial={false}>
-                              {isExpanded && isGraded && sub.feedbackHistory && sub.feedbackHistory.length > 0 && (
+                              {isExpanded && canExpand && (
                                 <motion.div
                                   initial={{ height: 0 }}
                                   animate={{ height: "auto" }}
@@ -444,32 +449,87 @@ export default function StudentGradesPage() {
                                   transition={{ duration: 0.2 }}
                                   className="border-t border-border/40 bg-background/25"
                                 >
-                                  <div className="p-5 space-y-3.5">
-                                    <div className="flex items-center text-xs font-bold text-muted-foreground space-x-1.5">
-                                      <MessageSquare className="w-4 h-4 text-primary" />
-                                      <span>Instructor Comments & Revision History</span>
-                                    </div>
-                                    <div className="space-y-2.5">
-                                      {sub.feedbackHistory.map((item: any, idx: number) => (
-                                        <div
-                                          key={idx}
-                                          className="p-3.5 rounded bg-card/85 border border-border/40 text-sm space-y-1 relative"
-                                        >
-                                          <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold tracking-wider font-mono">
-                                            <span>Feedback Version #{idx + 1}</span>
-                                            <span>
-                                              {new Date(item.createdAt).toLocaleString(undefined, {
-                                                dateStyle: "medium",
-                                                timeStyle: "short",
-                                              })}
-                                            </span>
-                                          </div>
-                                          <p className="text-foreground leading-relaxed whitespace-pre-wrap">
-                                            {item.feedback}
-                                          </p>
+                                  <div className="p-5 space-y-5">
+                                    {/* AI Analysis section */}
+                                    {hasAnalysis && (
+                                      <div className="space-y-3">
+                                        <div className="flex items-center text-xs font-bold text-muted-foreground space-x-1.5">
+                                          <Bot className="w-4 h-4 text-primary" />
+                                          <span>AI & Handwriting Analysis</span>
                                         </div>
-                                      ))}
-                                    </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+                                          <div className="p-3.5 rounded border border-border bg-card/85">
+                                            <span className="text-muted-foreground font-semibold block mb-1">Handwriting Check</span>
+                                            {sub.isHandwritten ? (
+                                              <div className="flex items-center gap-1.5 text-success font-bold">
+                                                <CheckCircle className="w-4 h-4" />
+                                                Verified Handwritten
+                                              </div>
+                                            ) : (
+                                              <div className="flex items-center gap-1.5 text-destructive font-bold">
+                                                <AlertTriangle className="w-4 h-4" />
+                                                Digital / Printed Text Detected
+                                              </div>
+                                            )}
+                                            <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                                              {sub.handwrittenExplanation || "No description provided."}
+                                            </p>
+                                          </div>
+
+                                          <div className="p-3.5 rounded border border-border bg-card/85">
+                                            <span className="text-muted-foreground font-semibold block mb-1">AI Plagiarism Check</span>
+                                            {sub.isAiGenerated ? (
+                                              <div className="flex items-center gap-1.5 text-destructive font-bold">
+                                                <AlertTriangle className="w-4 h-4" />
+                                                AI Generated ({sub.aiScore}%)
+                                              </div>
+                                            ) : (
+                                              <div className="flex items-center gap-1.5 text-success font-bold">
+                                                <CheckCircle className="w-4 h-4" />
+                                                Human Written ({100 - (sub.aiScore || 0)}% human)
+                                              </div>
+                                            )}
+                                            <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                                              {sub.aiExplanation || "No analysis provided."}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Divider if both exist */}
+                                    {hasAnalysis && hasFeedback && <div className="border-t border-border/40 my-3" />}
+
+                                    {/* Instructor Comments / Feedback section */}
+                                    {hasFeedback && (
+                                      <div className="space-y-3">
+                                        <div className="flex items-center text-xs font-bold text-muted-foreground space-x-1.5">
+                                          <MessageSquare className="w-4 h-4 text-primary" />
+                                          <span>Instructor Comments & Revision History</span>
+                                        </div>
+                                        <div className="space-y-2.5">
+                                          {sub.feedbackHistory.map((item: any, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              className="p-3.5 rounded bg-card/85 border border-border/40 text-sm space-y-1 relative"
+                                            >
+                                              <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold tracking-wider font-mono">
+                                                <span>Feedback Version #{idx + 1}</span>
+                                                <span>
+                                                  {new Date(item.createdAt).toLocaleString(undefined, {
+                                                    dateStyle: "medium",
+                                                    timeStyle: "short",
+                                                  })}
+                                                </span>
+                                              </div>
+                                              <p className="text-foreground leading-relaxed whitespace-pre-wrap">
+                                                {item.feedback}
+                                              </p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </motion.div>
                               )}
