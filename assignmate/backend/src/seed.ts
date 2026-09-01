@@ -8,7 +8,7 @@ import { Submission } from "./models/Submission";
 
 dotenv.config();
 
-const mongoUrl = process.env.MONGODB_URI || "mongodb://localhost:27017/cvsync";
+const mongoUrl = process.env.MONGODB_URI || "mongodb://localhost:27017/assigntantra";
 
 async function seed() {
   try {
@@ -18,10 +18,10 @@ async function seed() {
     const passwordHash = await bcrypt.hash("Password@123", 10);
 
     // 1. Create or Update Teacher
-    let teacher = await User.findOne({ email: "teacher@assignmate.com" });
+    let teacher = await User.findOne({ email: "teacher@assigntantra.com" });
     if (!teacher) {
       teacher = new User({
-        email: "teacher@assignmate.com",
+        email: "teacher@assigntantra.com",
         password: passwordHash,
         name: "Prof. Rajesh Sharma",
         role: "teacher",
@@ -30,19 +30,19 @@ async function seed() {
         semester: 0,
       });
       await teacher.save();
-      console.log("Teacher account created: teacher@assignmate.com");
+      console.log("Teacher account created: teacher@assigntantra.com");
     } else {
       teacher.password = passwordHash;
       teacher.role = "teacher";
       await teacher.save();
-      console.log("Teacher account updated: teacher@assignmate.com");
+      console.log("Teacher account updated: teacher@assigntantra.com");
     }
 
     // 2. Create or Update Student
-    let student = await User.findOne({ email: "student@assignmate.com" });
+    let student = await User.findOne({ email: "student@assigntantra.com" });
     if (!student) {
       student = new User({
-        email: "student@assignmate.com",
+        email: "student@assigntantra.com",
         password: passwordHash,
         name: "Garvit Gupta",
         role: "student",
@@ -51,12 +51,12 @@ async function seed() {
         semester: 6,
       });
       await student.save();
-      console.log("Student account created: student@assignmate.com");
+      console.log("Student account created: student@assigntantra.com");
     } else {
       student.password = passwordHash;
       student.role = "student";
       await student.save();
-      console.log("Student account updated: student@assignmate.com");
+      console.log("Student account updated: student@assigntantra.com");
     }
 
     // 3. Create or Link Demo Classroom

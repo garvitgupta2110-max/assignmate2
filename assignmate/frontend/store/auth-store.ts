@@ -45,7 +45,7 @@ export const useAuthStore = create<AuthState>()(
         })),
     }),
     {
-      name: "assignmate-auth",
+      name: "assigntantra-auth",
     }
   )
 );

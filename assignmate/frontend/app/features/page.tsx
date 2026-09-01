@@ -99,7 +99,7 @@ export default function FeaturesPage() {
             <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-xl">CVSync</span>
+            <span className="font-bold text-xl">AssignTantra</span>
           </Link>
           <div className="flex items-center space-x-4">
             <Link href="/">
@@ -195,7 +195,7 @@ export default function FeaturesPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-24">
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h2 className="text-3xl font-bold">Built for Peak Productivity</h2>
-          <p className="text-muted-foreground mt-2 text-sm">CVSync offers smart features to ensure you stay ahead of the class.</p>
+          <p className="text-muted-foreground mt-2 text-sm">AssignTantra offers smart features to ensure you stay ahead of the class.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {additionalHighlights.map((hl, idx) => {

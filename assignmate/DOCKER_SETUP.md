@@ -1,6 +1,6 @@
-# ResuMate - Docker Compose Setup
+# AssignTantra - Docker Compose Setup
 
-This file helps you run ResuMate using Docker without manual setup.
+This file helps you run AssignTantra using Docker without manual setup.
 
 ## Prerequisites
 
@@ -11,8 +11,8 @@ This file helps you run ResuMate using Docker without manual setup.
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/resumate.git
-   cd resumate
+   git clone https://github.com/yourusername/assigntantra.git
+   cd assigntantra
    ```
 
 2. **Create environment files**
@@ -54,10 +54,10 @@ docker-compose down
 docker-compose up -d --build
 
 # Access MongoDB shell
-docker exec -it resumate-mongo mongo
+docker exec -it assigntantra-mongo mongo
 
 # Access backend shell
-docker exec -it resumate-backend /bin/bash
+docker exec -it assigntantra-backend /bin/bash
 ```
 
 ## Troubleshooting

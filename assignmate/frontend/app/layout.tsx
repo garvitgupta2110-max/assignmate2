@@ -16,7 +16,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CVSync - Student Productivity Platform",
+  title: "AssignTantra - Student Productivity Platform",
   description:
     "Everything a student needs. One dashboard. Resume building, presentations, assignments, and timetable planning.",
   icons: {

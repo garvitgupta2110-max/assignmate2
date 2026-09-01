@@ -1,7 +1,7 @@
 {
-  "name": "cvsync-backend",
+  "name": "assigntantra-backend",
   "version": "1.0.0",
-  "description": "CVSync Backend API",
+  "description": "AssignTantra Backend API",
   "main": "src/index.ts",
   "scripts": {
     "start": "node dist/index.js",

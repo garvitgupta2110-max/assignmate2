@@ -3,7 +3,7 @@ services:
   # Backend API Web Service
   # ----------------------------------------------------
   - type: web
-    name: assignmate-backend
+    name: assigntantra-backend
     runtime: node
     plan: free
     region: oregon
@@ -24,7 +24,7 @@ services:
       - key: FRONTEND_URL
         fromService:
           type: web
-          name: assignmate-frontend
+          name: assigntantra-frontend
           property: host
       - key: ALLOWED_ORIGINS
         sync: false
@@ -53,7 +53,7 @@ services:
   # Frontend Next.js Web Service
   # ----------------------------------------------------
   - type: web
-    name: assignmate-frontend
+    name: assigntantra-frontend
     runtime: node
     plan: free
     region: oregon
@@ -67,19 +67,19 @@ services:
       - key: NEXT_PUBLIC_API_URL
         fromService:
           type: web
-          name: assignmate-backend
+          name: assigntantra-backend
           property: host
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: NEXTAUTH_URL
         fromService:
           type: web
-          name: assignmate-frontend
+          name: assigntantra-frontend
           property: host
       - key: NEXT_PUBLIC_APP_URL
         fromService:
           type: web
-          name: assignmate-frontend
+          name: assigntantra-frontend
           property: host
       - key: NEXT_PUBLIC_GEMINI_API_KEY
         sync: false

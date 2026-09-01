@@ -1,4 +1,4 @@
-# ResuMate Development Guide
+# AssignTantra Development Guide
 
 ## Quick Start for Developers
 
@@ -6,8 +6,8 @@
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/resumate.git
-   cd resumate
+   git clone https://github.com/yourusername/assigntantra.git
+   cd assigntantra
    ```
 
 2. **Install dependencies**

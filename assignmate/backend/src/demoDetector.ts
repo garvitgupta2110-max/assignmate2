@@ -6,7 +6,7 @@ import { analyzeSubmissionDocument } from "./utils/aiDetector";
 dotenv.config();
 
 async function runDemo() {
-  console.log("=== AssignMate AI & Handwriting Detection Demo ===");
+  console.log("=== AssignTantra AI & Handwriting Detection Demo ===");
   console.log("Checking environment configurations...");
   
   const apiKey = process.env.GEMINI_API_KEY;

@@ -23,7 +23,7 @@ export function LandingPage() {
             <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-xl">CVSync</span>
+            <span className="font-bold text-xl">AssignTantra</span>
           </div>
           <div className="flex items-center space-x-4">
             <Link href="/features">
@@ -147,7 +147,7 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-3 gap-8 text-center">
             {[
-              { number: "10K+", label: "Students Using CVSync" },
+              { number: "10K+", label: "Students Using AssignTantra" },
               { number: "98%", label: "Satisfaction Rate" },
               { number: "50M+", label: "Tasks Completed" },
             ].map((stat, index) => (
@@ -169,7 +169,7 @@ export function LandingPage() {
             <CardContent className="pt-12 pb-12">
               <h2 className="text-3xl font-bold mb-4">Ready to transform your academic life?</h2>
               <p className="text-muted-foreground mb-8">
-                Join thousands of students already using CVSync to ace their studies.
+                Join thousands of students already using AssignTantra to ace their studies.
               </p>
               <Link href="/dashboard">
                 <Button

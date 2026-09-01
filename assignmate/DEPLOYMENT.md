@@ -1,4 +1,4 @@
-# ResuMate - Comprehensive Deployment Guide
+# AssignTantra - Comprehensive Deployment Guide
 
 ## Pre-Deployment Checklist
 
@@ -17,10 +17,10 @@
 
 ### Frontend (.env.production)
 ```
-NEXT_PUBLIC_API_URL=https://api.resumate.app
-NEXT_PUBLIC_APP_URL=https://resumate.app
+NEXT_PUBLIC_API_URL=https://assigntantra-backend.onrender.com/api
+NEXT_PUBLIC_APP_URL=https://assigntantra-frontend.onrender.com
 NEXTAUTH_SECRET=generate-a-secure-random-key
-NEXTAUTH_URL=https://resumate.app
+NEXTAUTH_URL=https://assigntantra-frontend.onrender.com
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_production_google_client_id
 GOOGLE_CLIENT_SECRET=your_production_google_client_secret
 NEXT_PUBLIC_GEMINI_API_KEY=your_production_gemini_api_key
@@ -31,32 +31,36 @@ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloudinary_name
 ```
 PORT=5000
 NODE_ENV=production
-MONGODB_URI=your_mongodb_atlas_uri
-JWT_SECRET=generate-a-secure-random-key
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/assigntantra?retryWrites=true&w=majority
+JWT_SECRET=generate-a-secure-random-key-for-jwt
 JWT_EXPIRY=7d
 GOOGLE_CLIENT_ID=your_production_google_client_id
 GOOGLE_CLIENT_SECRET=your_production_google_client_secret
 GEMINI_API_KEY=your_production_gemini_api_key
 CLOUDINARY_CLOUD_NAME=your_cloudinary_name
 CLOUDINARY_API_KEY=your_cloudinary_api_key
-CLOUDINARY_API_SECRET=your_cloudinary_secret
-FRONTEND_URL=https://resumate.app
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+FRONTEND_URL=https://assigntantra-frontend.onrender.com
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your_email@gmail.com
 SMTP_PASS=your_app_password
 ```
 
-## Deploying to Vercel (Frontend)
+## Deployment Options
 
-1. **Connect GitHub repository**
-   - Go to vercel.com
-   - Click "New Project"
-   - Select your GitHub repository
-   - Click "Import"
+### Option 1: Vercel (Frontend) + Render (Backend) - RECOMMENDED
 
-2. **Configure Project**
-   - Set Project Name: `resumate`
+#### Deploy Frontend on Vercel
+
+1. **Push code to GitHub**
+2. **Import repository on Vercel**
+   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
+   - Click "Add New" -> "Project"
+   - Select your repository
+   - Set Root Directory: `frontend`
+   - Set Framework Preset: `Next.js`
+   - Set Project Name: `assigntantra`
    - Set Root Directory: `./frontend`
    - Set Build Command: `npm run build`
    - Set Start Command: `npm start`
@@ -337,13 +341,13 @@ SMTP_PASS=your_app_password
 
 ```bash
 # Check backend health
-curl https://api.resumate.app/health
+curl https://assigntantra-backend.onrender.com/health
 
 # View frontend logs
-vercel logs resumate
+vercel logs assigntantra
 
 # View backend logs
-render logs resumate-api
+render logs assigntantra-backend
 
 # Database stats
 db.stats()

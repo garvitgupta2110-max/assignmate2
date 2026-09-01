@@ -46,7 +46,7 @@ export default function AboutPage() {
             <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-xl">CVSync</span>
+            <span className="font-bold text-xl">AssignTantra</span>
           </Link>
           <div className="flex items-center space-x-4">
             <Link href="/">
@@ -88,7 +88,7 @@ export default function AboutPage() {
             <span>Our Story</span>
           </div>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-            About CVSync
+            About AssignTantra
           </h1>
           <p className="text-lg text-muted-foreground">
             We are on a mission to build the ultimate, AI-driven digital workspaces for college students worldwide.
@@ -109,7 +109,7 @@ export default function AboutPage() {
               <div>
                 <h2 className="text-2xl font-bold mb-4">The Student Workspace of Tomorrow</h2>
                 <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                  College students juggle dozens of tasks daily—drafting resumes, preparing presentations, tracking deadlines, and managing calendars. CVSync consolidates all these functions into a single, cohesive dashboard, enriched with Google Gemini AI power.
+                  College students juggle dozens of tasks daily—drafting resumes, preparing presentations, tracking deadlines, and managing calendars. AssignTantra consolidates all these functions into a single, cohesive dashboard, enriched with Google Gemini AI power.
                 </p>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   We believe that productivity tools should not only be functional but beautiful and responsive, providing micro-interactions that inspire and simplify work.
@@ -131,7 +131,7 @@ export default function AboutPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-24">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <h2 className="text-3xl font-bold">Meet the Founders</h2>
-          <p className="text-muted-foreground mt-2 text-sm">The creators behind the CVSync dashboard.</p>
+          <p className="text-muted-foreground mt-2 text-sm">The creators behind the AssignTantra dashboard.</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -154,7 +154,7 @@ export default function AboutPage() {
                     <p className="text-sm text-primary font-semibold">Founder & Lead Architect</p>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Garvit is a software engineer and visionary designer who founded CVSync to solve the fragmentation of college workflow tools. With a strong passion for developer experience, web aesthetics, and AI orchestration, he architected CVSync to serve as an all-in-one productivity hub for college campuses.
+                    Garvit is a software engineer and visionary designer who founded AssignTantra to solve the fragmentation of college workflow tools. With a strong passion for developer experience, web aesthetics, and AI orchestration, he architected AssignTantra to serve as an all-in-one productivity hub for college campuses.
                   </p>
                   <div className="flex items-center justify-center sm:justify-start space-x-4 pt-2">
                     <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
@@ -191,7 +191,7 @@ export default function AboutPage() {
                     <p className="text-sm text-secondary font-semibold">Co-Founder & Lead Engineer</p>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Dhruv is a software engineer and systems architect who co-founded CVSync to empower students through advanced productivity systems. With deep expertise in backend infrastructure, database optimization, and cloud operations, he handles scaling and intelligence orchestration for the platform.
+                    Dhruv is a software engineer and systems architect who co-founded AssignTantra to empower students through advanced productivity systems. With deep expertise in backend infrastructure, database optimization, and cloud operations, he handles scaling and intelligence orchestration for the platform.
                   </p>
                   <div className="flex items-center justify-center sm:justify-start space-x-4 pt-2">
                     <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
@@ -248,7 +248,7 @@ export default function AboutPage() {
         <Card className="border-border/50 bg-card/60 p-12">
           <h2 className="text-3xl font-bold mb-4">Join our growing userbase</h2>
           <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-            Take control of your studies, resume creations, and class presentations with CVSync.
+            Take control of your studies, resume creations, and class presentations with AssignTantra.
           </p>
           <Link href="/dashboard">
             <Button animation="shine" size="lg" className="bg-gradient-to-r from-primary to-secondary">

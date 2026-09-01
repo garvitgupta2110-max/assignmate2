@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 export const connectDB = async () => {
   try {
-    const mongoUrl = process.env.MONGODB_URI || "mongodb://localhost:27017/cvsync";
+    const mongoUrl = process.env.MONGODB_URI || "mongodb://localhost:27017/assigntantra";
     await mongoose.connect(mongoUrl);
     console.log("Database connected successfully");
   } catch (error) {

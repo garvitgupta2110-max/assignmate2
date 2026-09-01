@@ -258,7 +258,7 @@ export function exportPresentation(presentation: any) {
             <span class="text-xs font-bold tracking-widest uppercase text-slate-500 mb-2">${subject || "Presentation"}</span>
             <h1 class="text-4xl md:text-5xl font-extrabold ${titleColor} max-w-3xl">${title}</h1>
             <div class="w-20 h-1 bg-indigo-500 my-6"></div>
-            <p class="text-sm text-slate-500 font-medium">Generated with AssignMate AI</p>
+            <p class="text-sm text-slate-500 font-medium">Generated with AssignTantra AI</p>
           </div>
         </div>
 

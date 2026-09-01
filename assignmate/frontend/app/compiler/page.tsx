@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Sidebar } from "@/components/sidebar";
@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToastStore } from "@/store/toast-store";
 import api from "@/lib/api";
+import { CodeEditor, SupportedLanguage } from "@/components/compiler/code-editor";
 import {
   Play,
   RotateCcw,
-  Terminal,
   Code2,
   AlertTriangle,
   ShieldCheck,
@@ -27,26 +27,42 @@ import {
   Lock,
 } from "lucide-react";
 
-const TEMPLATES = {
-  c: `#include <stdio.h>
-
-int main() {
-    printf("Hello, CVSync C Compiler!\\n");
-    return 0;
-}
-`,
+const TEMPLATES: Record<SupportedLanguage, string> = {
   python: `# Print greeting
-print("Hello, CVSync Python Compiler!")
+print("Hello, AssignTantra Python Compiler!")
 
 # Example: Read stdin
 # name = input()
 # print(f"Welcome, {name}!")
 `,
+  c: `#include <stdio.h>
+
+int main() {
+    printf("Hello, AssignTantra C Compiler!\\n");
+    return 0;
+}
+`,
+  cpp: `#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "Hello, AssignTantra C++ Compiler!" << endl;
+    return 0;
+}
+`,
   java: `public class Main {
     public static void main(String[] args) {
-        System.out.println("Hello, CVSync Java Compiler!");
+        System.out.println("Hello, AssignTantra Java Compiler!");
     }
 }
+`,
+  javascript: `// JavaScript Execution (Node.js)
+console.log("Hello, AssignTantra JavaScript Compiler!");
+
+// Example: Read stdin (if provided)
+// const fs = require("fs");
+// const input = fs.readFileSync(0, "utf-8").trim();
+// console.log("Input received:", input);
 `,
 };
 
@@ -56,7 +72,7 @@ function CompilerContent() {
 
   const addToast = useToastStore((state) => state.addToast);
 
-  const [language, setLanguage] = useState<"c" | "python" | "java">("python");
+  const [language, setLanguage] = useState<SupportedLanguage>("python");
   const [code, setCode] = useState<string>(TEMPLATES.python);
   const [stdin, setStdin] = useState<string>("");
   const [output, setOutput] = useState<string>("");
@@ -85,6 +101,21 @@ function CompilerContent() {
     actual: string;
     input: string;
   } | null>(null);
+
+  // Parse error line number for Monaco error squigglies / markers
+  const errorLineNumber = useMemo(() => {
+    if (status !== "compile-error" && status !== "runtime-error") return null;
+    if (!output) return null;
+    const pyMatch = output.match(/line (\d+)/i);
+    if (pyMatch && pyMatch[1]) return parseInt(pyMatch[1], 10);
+    const cMatch = output.match(/(?:solution\.(?:c|cpp)|main\.(?:c|cpp)):(\d+)/i);
+    if (cMatch && cMatch[1]) return parseInt(cMatch[1], 10);
+    const javaMatch = output.match(/(?:\w+\.java):(\d+)/i);
+    if (javaMatch && javaMatch[1]) return parseInt(javaMatch[1], 10);
+    const genMatch = output.match(/:(\d+):\d+:/);
+    if (genMatch && genMatch[1]) return parseInt(genMatch[1], 10);
+    return null;
+  }, [status, output]);
 
   // Format seconds to HH:MM:SS or MM:SS
   const formatTime = (seconds: number) => {
@@ -262,8 +293,8 @@ function CompilerContent() {
             setSelectedAssignmentId(matched._id || matched.id);
             let targetLang = language;
             if (matched.allowedLanguages && matched.allowedLanguages.length === 1) {
-              const singleLang = matched.allowedLanguages[0] as "c" | "python" | "java";
-              if (["c", "python", "java"].includes(singleLang)) {
+              const singleLang = matched.allowedLanguages[0] as SupportedLanguage;
+              if (["c", "cpp", "python", "java", "javascript"].includes(singleLang)) {
                 targetLang = singleLang;
                 setLanguage(singleLang);
               }
@@ -323,8 +354,8 @@ function CompilerContent() {
 
       let targetLang = language;
       if (matched?.allowedLanguages && matched.allowedLanguages.length === 1) {
-        const singleLang = matched.allowedLanguages[0] as "c" | "python" | "java";
-        if (["c", "python", "java"].includes(singleLang)) {
+        const singleLang = matched.allowedLanguages[0] as SupportedLanguage;
+        if (["c", "cpp", "python", "java", "javascript"].includes(singleLang)) {
           targetLang = singleLang;
           setLanguage(singleLang);
         }
@@ -566,8 +597,10 @@ function CompilerContent() {
     };
   }, [isTestActive]);
 
-  const preventCopyPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    e.preventDefault();
+  const preventCopyPaste = (e?: any) => {
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
     addToast({
       title: "Action Blocked",
       description: "Copying, cutting, or pasting is strictly disabled for code integrity.",
@@ -575,11 +608,10 @@ function CompilerContent() {
     });
   };
 
-
   // Handle template switching
-  const handleLanguageChange = (lang: "c" | "python" | "java") => {
+  const handleLanguageChange = (lang: SupportedLanguage) => {
     setLanguage(lang);
-    setCode(TEMPLATES[lang]);
+    setCode(TEMPLATES[lang] || "");
     setOutput("");
     setStatus("idle");
   };
@@ -588,21 +620,6 @@ function CompilerContent() {
     setCode(TEMPLATES[language]);
     setOutput("");
     setStatus("idle");
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const start = e.currentTarget.selectionStart;
-      const end = e.currentTarget.selectionEnd;
-      const newValue = code.substring(0, start) + "    " + code.substring(end);
-      setCode(newValue);
-      
-      // reset cursor position after browser updates textarea
-      setTimeout(() => {
-        e.currentTarget.selectionStart = e.currentTarget.selectionEnd = start + 4;
-      }, 0);
-    }
   };
 
   const handleRun = async () => {
@@ -814,54 +831,18 @@ function CompilerContent() {
           {/* Test Workspace Grid */}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 p-6 gap-6 overflow-hidden">
             {/* Code Editor Block */}
-            <div className="lg:col-span-2 relative border border-border/60 bg-card/60 backdrop-blur-sm rounded-lg flex flex-col overflow-hidden">
-              {isLocked && (
-                <div className="absolute inset-0 bg-[#0B0F19]/95 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 z-50">
-                  <AlertTriangle className="w-16 h-16 text-destructive animate-bounce mb-4" />
-                  <h3 className="text-xl font-bold text-foreground">Test Disqualified & Locked</h3>
-                  <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-5">
-                    Proctoring Alert: You switched tabs or left the browser window. The test session is locked to prevent academic plagiarism.
-                  </p>
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      if (typeof document !== "undefined" && document.fullscreenElement && document.exitFullscreen) {
-                        document.exitFullscreen().catch(() => {});
-                      }
-                      setIsLocked(false);
-                      setTabSwitchCount(0);
-                      setIsTestActive(false);
-                      setSelectedAssignmentId("");
-                      handleReset();
-                    }}
-                    className="text-xs font-semibold px-4 py-2 h-auto"
-                  >
-                    Reset & Return to Compiler
-                  </Button>
-                </div>
-              )}
-
-              <div className="py-2.5 px-4 bg-muted/40 border-b border-border/40 flex items-center justify-between">
-                <span className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                  <Code2 className="w-4 h-4 text-primary" />
-                  Test Editor
-                </span>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase px-2 py-0.5 bg-muted rounded">
-                  {language}
-                </span>
-              </div>
-
-              <textarea
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onCopy={preventCopyPaste}
-                onPaste={preventCopyPaste}
-                onCut={preventCopyPaste}
-                disabled={isLocked}
-                className="flex-1 w-full p-6 bg-slate-950 font-mono text-sm leading-relaxed text-slate-100 placeholder:text-muted-foreground focus:outline-none resize-none overflow-y-auto"
-                spellCheck={false}
-                placeholder="// Write your exam/test code solution here..."
+            <div className="lg:col-span-2 relative flex flex-col overflow-hidden">
+              <CodeEditor
+                code={code}
+                onChange={setCode}
+                language={language}
+                onReset={handleReset}
+                isLocked={isLocked}
+                isTestMode={true}
+                preventCopyPaste={preventCopyPaste}
+                errorLine={errorLineNumber}
+                errorMessage={output}
+                height="100%"
               />
             </div>
 
@@ -990,7 +971,7 @@ function CompilerContent() {
                     Interactive Code Compiler
                   </h1>
                   <p className="text-muted-foreground text-sm mt-1">
-                    Write, compile, and run C, Python, and Java programs in real-time.
+                    Write, compile, and run Python, C, C++, Java, and JavaScript programs in real-time with VS Code editor features.
                   </p>
                 </div>
 
@@ -1001,12 +982,14 @@ function CompilerContent() {
                     </label>
                     <select
                       value={language}
-                      onChange={(e) => handleLanguageChange(e.target.value as any)}
+                      onChange={(e) => handleLanguageChange(e.target.value as SupportedLanguage)}
                       className="bg-card border border-border/80 text-foreground px-3.5 py-1.5 rounded-md text-sm font-semibold focus:outline-none focus:border-primary transition-colors cursor-pointer"
                     >
-                      <option value="c">C (GCC)</option>
                       <option value="python">Python 3</option>
-                      <option value="java">Java (JDK)</option>
+                      <option value="c">C (GCC)</option>
+                      <option value="cpp">C++ (G++)</option>
+                      <option value="java">Java (OpenJDK)</option>
+                      <option value="javascript">JavaScript (Node)</option>
                     </select>
                   </div>
 
@@ -1175,51 +1158,18 @@ function CompilerContent() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Code input pane */}
                 <div className="lg:col-span-2 space-y-4">
-                  <Card className="border-border/50 bg-card/60 backdrop-blur-sm flex flex-col h-[550px]">
-                    <CardHeader className="py-3 px-4 border-b border-border/40 flex flex-row items-center justify-between">
-                      <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Terminal className="w-4 h-4 text-muted-foreground" />
-                        Source Code
-                      </CardTitle>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase px-2 py-0.5 bg-muted/40 rounded">
-                        {language}
-                      </span>
-                    </CardHeader>
-                    <CardContent className="p-0 flex-1 relative">
-                      {isLocked && (
-                        <div className="absolute inset-0 bg-background/90 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 z-50 rounded-b-md">
-                          <AlertTriangle className="w-12 h-12 text-destructive animate-bounce mb-3" />
-                          <h3 className="text-lg font-bold text-foreground">Compiler Locked</h3>
-                          <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4">
-                            You switched tabs or left the browser window. Copying, pasting, and tab switching are strictly prohibited to maintain code integrity.
-                          </p>
-                          <Button
-                            variant="destructive"
-                            onClick={() => {
-                              setIsLocked(false);
-                              setTabSwitchCount(0);
-                              handleReset();
-                            }}
-                            className="text-xs font-semibold px-4 py-1.5 h-auto"
-                          >
-                            Reset & Unlock Editor
-                          </Button>
-                        </div>
-                      )}
-                      <textarea
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        onCopy={preventCopyPaste}
-                        onPaste={preventCopyPaste}
-                        onCut={preventCopyPaste}
-                        disabled={isLocked}
-                        className="w-full h-full p-4 bg-background/20 font-mono text-sm leading-relaxed text-slate-100 placeholder:text-muted-foreground focus:outline-none resize-none overflow-y-auto"
-                        spellCheck={false}
-                        placeholder="// Write your code here..."
-                      />
-                    </CardContent>
-                  </Card>
+                  <CodeEditor
+                    code={code}
+                    onChange={setCode}
+                    language={language}
+                    onLanguageChange={handleLanguageChange}
+                    onReset={handleReset}
+                    isLocked={isLocked}
+                    isTestMode={false}
+                    errorLine={errorLineNumber}
+                    errorMessage={output}
+                    height="560px"
+                  />
                 </div>
 
                 {/* Stdin and Stdout pane */}

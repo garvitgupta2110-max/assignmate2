@@ -97,7 +97,7 @@ export default function Settings() {
     const currentPerm = getNotificationPermission();
     if (currentPerm === "granted") {
       triggerToast("Notifications Active", "Push notifications are already enabled in your browser.", "success");
-      sendNotification("AssignMate Alert", "Browser push notifications are active! 🚀");
+      sendNotification("AssignTantra Alert", "Browser push notifications are active! 🚀");
       return;
     }
 
@@ -111,7 +111,7 @@ export default function Settings() {
 
     if (newPerm === "granted") {
       triggerToast("Permission Granted", "Notifications enabled successfully!", "success");
-      sendNotification("Notifications Active", "Push notifications are now active on AssignMate! 🚀");
+      sendNotification("Notifications Active", "Push notifications are now active on AssignTantra! 🚀");
     } else {
       triggerToast("Permission Denied", "Notifications were blocked.", "destructive");
     }

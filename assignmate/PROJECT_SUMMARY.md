@@ -1,8 +1,8 @@
-# ResuMate - Project Complete Summary
+# AssignTantra - Project Complete Summary
 
 ## What Has Been Built
 
-ResuMate is a complete, production-ready SaaS platform for college students. This comprehensive documentation outlines every aspect of the application.
+AssignTantra is a complete, production-ready SaaS platform for college students. This comprehensive documentation outlines every aspect of the application.
 
 ## 📦 Deliverables
 
@@ -459,9 +459,8 @@ The app is structured for Free and Pro plans:
 ## 📞 Support & Contact
 
 - GitHub Issues for bugs
-- Email: contact@resumate.app
-- Website: https://resumate.app
-- Twitter: @ResuMateApp
+- Email: contact@assigntantra.com
+- Website: https://assigntantra.onrender.com
 
 ## 📄 License
 
@@ -475,7 +474,7 @@ MIT License - Free to use and modify
 
 ---
 
-**ResuMate** is now ready for development and deployment. Follow the guides in README.md, DEVELOPMENT.md, and DEPLOYMENT.md for detailed instructions.
+**AssignTantra** is now ready for development and deployment. Follow the guides in README.md, DEVELOPMENT.md, and DEPLOYMENT.md for detailed instructions.
 
 Happy coding! 🚀
 

@@ -1,4 +1,4 @@
-# Deploying AssignMate to Render
+# Deploying AssignTantra to Render
 
 This repository is pre-configured for automated and manual deployment on [Render](https://render.com).
 
@@ -23,18 +23,18 @@ Render Blueprint uses the [`render.yaml`](file:///c:/Users/garvi/OneDrive/Deskto
    - Select **Blueprint**.
 
 3. **Connect Repository**:
-   - Select your AssignMate repository.
+   - Select your AssignTantra repository.
    - Render will detect [`render.yaml`](file:///c:/Users/garvi/OneDrive/Desktop/assignmate2/render.yaml) automatically.
 
 4. **Fill Required Environment Variables**:
    Render will prompt you for any un-synced variables. Fill in:
-   - `MONGODB_URI`: Your MongoDB Atlas connection string (e.g., `mongodb+srv://<user>:<password>@cluster.mongodb.net/assignmate?retryWrites=true&w=majority`).
+   - `MONGODB_URI`: Your MongoDB Atlas connection string (e.g., `mongodb+srv://<user>:<password>@cluster.mongodb.net/assigntantra?retryWrites=true&w=majority`).
    - `GEMINI_API_KEY`: Your Google Gemini API key.
    - `NEXT_PUBLIC_GEMINI_API_KEY`: Same Gemini API key for the frontend.
    - `CLOUDINARY_*` / `FIREBASE_*`: Cloudinary and Firebase credentials (if using file uploads and client auth).
 
 5. **Click "Apply"**:
-   - Render will build and deploy both `assignmate-backend` and `assignmate-frontend`.
+   - Render will build and deploy both `assigntantra-backend` and `assigntantra-frontend`.
    - The frontend will automatically link to the backend service URL.
 
 ---
@@ -43,12 +43,12 @@ Render Blueprint uses the [`render.yaml`](file:///c:/Users/garvi/OneDrive/Deskto
 
 If you prefer to configure each service manually in the Render dashboard:
 
-### 1. Deploy the Backend API (`assignmate-backend`)
+### 1. Deploy the Backend API (`assigntantra-backend`)
 
 1. In Render Dashboard, click **New +** → **Web Service**.
 2. Connect your Git repository.
 3. Configure the service settings:
-   - **Name**: `assignmate-backend`
+   - **Name**: `assigntantra-backend`
    - **Region**: `Oregon (US West)` or your preferred region
    - **Root Directory**: `assignmate/backend`
    - **Runtime**: `Node`
@@ -65,22 +65,22 @@ If you prefer to configure each service manually in the Render dashboard:
    | `MONGODB_URI` | `mongodb+srv://...` | From MongoDB Atlas |
    | `JWT_SECRET` | *(click Generate or enter a secure random string)* | Required |
    | `JWT_EXPIRY` | `7d` | Optional |
-   | `FRONTEND_URL` | `https://assignmate-frontend.onrender.com` | (Update after creating frontend) |
+   | `FRONTEND_URL` | `https://assigntantra-frontend.onrender.com` | (Update after creating frontend) |
    | `GEMINI_API_KEY` | `your_gemini_key` | Optional / AI Tutor |
    | `CLOUDINARY_CLOUD_NAME` | `your_cloud_name` | Optional |
    | `CLOUDINARY_API_KEY` | `your_api_key` | Optional |
    | `CLOUDINARY_API_SECRET` | `your_api_secret` | Optional |
 
-6. Click **Create Web Service**. Note the backend URL (e.g., `https://assignmate-backend.onrender.com`).
+6. Click **Create Web Service**. Note the backend URL (e.g., `https://assigntantra-backend.onrender.com`).
 
 ---
 
-### 2. Deploy the Frontend (`assignmate-frontend`)
+### 2. Deploy the Frontend (`assigntantra-frontend`)
 
 1. In Render Dashboard, click **New +** → **Web Service**.
 2. Connect your Git repository.
 3. Configure the service settings:
-   - **Name**: `assignmate-frontend`
+   - **Name**: `assigntantra-frontend`
    - **Region**: Same region as backend (e.g. `Oregon`)
    - **Root Directory**: `assignmate/frontend`
    - **Runtime**: `Node`
@@ -91,10 +91,10 @@ If you prefer to configure each service manually in the Render dashboard:
    | Key | Value | Notes |
    |---|---|---|
    | `NODE_ENV` | `production` | Required |
-   | `NEXT_PUBLIC_API_URL` | `https://assignmate-backend.onrender.com/api` | Your deployed backend URL |
-   | `NEXT_PUBLIC_APP_URL` | `https://assignmate-frontend.onrender.com` | Your deployed frontend URL |
+   | `NEXT_PUBLIC_API_URL` | `https://assigntantra-backend.onrender.com/api` | Your deployed backend URL |
+   | `NEXT_PUBLIC_APP_URL` | `https://assigntantra-frontend.onrender.com` | Your deployed frontend URL |
    | `NEXTAUTH_SECRET` | *(click Generate or enter a random string)* | Required |
-   | `NEXTAUTH_URL` | `https://assignmate-frontend.onrender.com` | Frontend URL |
+   | `NEXTAUTH_URL` | `https://assigntantra-frontend.onrender.com` | Frontend URL |
    | `NEXT_PUBLIC_GEMINI_API_KEY` | `your_gemini_key` | Optional |
    | `NEXT_PUBLIC_FIREBASE_*` | *(Your Firebase Config Keys)* | Optional |
 

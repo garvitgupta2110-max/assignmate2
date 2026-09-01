@@ -1,5 +1,5 @@
 {
-  "name": "assignmate-deploy",
+  "name": "assigntantra-deploy",
   "version": "1.0.0",
   "scripts": {
     "postinstall": "npm --prefix backend install",

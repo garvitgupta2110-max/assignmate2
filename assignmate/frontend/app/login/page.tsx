@@ -225,7 +225,7 @@ export default function LoginPage() {
           role: user.role,
         }, token);
 
-        triggerToast("Account Created", "Your AssignMate account has been set up successfully.", "success");
+        triggerToast("Account Created", "Your AssignTantra account has been set up successfully.", "success");
         router.push(user.role === "teacher" ? "/teacher" : "/dashboard");
       }
     } catch (error: any) {
@@ -255,7 +255,7 @@ export default function LoginPage() {
             <Sparkles className="w-6 h-6 text-white" />
           </div>
           <span className="font-bold text-2xl tracking-wide bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-            AssignMate
+            AssignTantra
           </span>
         </div>
 

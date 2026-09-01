@@ -14,7 +14,7 @@ if (!fs.existsSync(TEMP_DIR)) {
 }
 
 export interface ExecuteRequest {
-  language: "c" | "python" | "java";
+  language: "c" | "cpp" | "python" | "java" | "javascript";
   code: string;
   stdin?: string;
 }
@@ -55,6 +55,13 @@ export async function executeCode({
       fs.writeFileSync(filePath, code);
       compileCmd = `gcc "${filePath}" -o "${exePath}"`;
       runCmd = `"${exePath}"`;
+    } else if (language === "cpp") {
+      fileName = "solution.cpp";
+      const filePath = path.join(workingDir, fileName);
+      const exePath = path.join(workingDir, "solution.exe");
+      fs.writeFileSync(filePath, code);
+      compileCmd = `g++ "${filePath}" -o "${exePath}"`;
+      runCmd = `"${exePath}"`;
     } else if (language === "java") {
       // Parse Java class name
       let className = "Main";
@@ -67,6 +74,11 @@ export async function executeCode({
       fs.writeFileSync(filePath, code);
       compileCmd = `javac "${filePath}"`;
       runCmd = `java -cp "${workingDir}" ${className}`;
+    } else if (language === "javascript") {
+      fileName = "solution.js";
+      const filePath = path.join(workingDir, fileName);
+      fs.writeFileSync(filePath, code);
+      runCmd = `node "${filePath}"`;
     } else {
       throw new Error("Unsupported language.");
     }
